@@ -16,11 +16,12 @@
     ]
   },
   "whatsapp": {
-    "habilitado": false,
+    "habilitado": true,
     "horario_envio": "08:00",
     "grupo_id": "",
-    "metodo": "pywhatkit",
-    "numero_telefone": ""
+    "metodo": "callmebot",
+    "numero_telefone": "559185140988",
+    "callmebot_apikey": "5144177"
   },
   "sistema": {
     "alarme_som": true,

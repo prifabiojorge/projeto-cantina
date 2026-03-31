@@ -83,6 +83,20 @@
                     </div>
                 </div>
 
+                <!-- Botão Enviar Relatório WhatsApp -->
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Enviar Relatório Agora</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="small text-muted mb-3">Envie o relatório de previsão de almoços para o WhatsApp agora, sem esperar o agendamento automático.</p>
+                        <button class="btn btn-success btn-lg w-100" id="btn-enviar-whatsapp" onclick="enviarRelatorioWhatsApp()">
+                            <i class="bi bi-whatsapp"></i> Enviar Relatório WhatsApp
+                        </button>
+                        <div id="whatsapp-status" class="mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+
                 <div class="card shadow mt-4">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instruções</h5>
@@ -418,6 +432,68 @@
                     </tr>
                 `;
                 tbody.innerHTML += row;
+            });
+        }
+
+        // Enviar relatório WhatsApp manualmente
+        function enviarRelatorioWhatsApp() {
+            const btn = document.getElementById('btn-enviar-whatsapp');
+            const statusDiv = document.getElementById('whatsapp-status');
+            
+            // Confirmar envio
+            if (!confirm('Deseja enviar o relatório de previsão de almoços para o WhatsApp agora?')) {
+                return;
+            }
+            
+            // Desabilitar botão e mostrar loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando...';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle"></i> Enviando relatório...</div>';
+            
+            // Fazer requisição
+            fetch('/api/relatorio/gerar-agora', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> <strong>Relatório enviado com sucesso!</strong><br>
+                            <small>${data.mensagem}</small>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong><br>
+                            <small>${data.mensagem}</small>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao enviar relatório:', error);
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i> <strong>Erro ao enviar relatório!</strong><br>
+                        <small>Verifique a conexão e tente novamente.</small>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Reabilitar botão após 3 segundos
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-whatsapp"></i> Enviar Relatório WhatsApp';
+                }, 3000);
+                
+                // Esconder status após 10 segundos
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 10000);
             });
         }
 
