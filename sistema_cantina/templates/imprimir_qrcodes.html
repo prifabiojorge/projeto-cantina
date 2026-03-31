@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imprimir QR Codes - Sistema Cantina Escolar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        @media screen {
+            .print-only {
+                display: none;
+            }
+            .page-break {
+                margin-bottom: 2rem;
+            }
+            .container {
+                max-width: 100%;
+            }
+        }
+        
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .qrcode-page, .qrcode-page * {
+                visibility: visible;
+            }
+            .qrcode-page {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                page-break-after: always;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+            @page {
+                margin: 0.5cm;
+                size: A4 portrait;
+            }
+            .qrcode-card {
+                border: 1px solid #ddd;
+                height: 10.5cm; /* Para caber 4 em A4 (29.7cm altura) */
+                width: 9.5cm;   /* Para caber 2 em A4 (21cm largura) */
+                padding: 0.5cm;
+                margin: 0;
+                float: left;
+                box-sizing: border-box;
+                position: relative;
+            }
+            .qrcode-grid {
+                display: block;
+                width: 100%;
+                overflow: hidden;
+            }
+        }
+        
+        .qrcode-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .qrcode-img {
+            max-width: 180px;
+            max-height: 180px;
+            margin: 0 auto;
+        }
+        
+        .student-info {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .student-name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .student-details {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .qrcode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        @media (min-width: 768px) {
+            .qrcode-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        .print-header {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+        
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4 no-print">
+        <div class="print-header">
+            <h1 class="mb-3"><i class="bi bi-qr-code"></i> Impressão em Lote de QR Codes</h1>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="bi bi-funnel"></i> Filtros</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="get" class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="turma" class="form-label">Turma</label>
+                                    <select class="form-select" id="turma" name="turma">
+                                        <option value="">Todas as turmas</option>
+                                        {% for t in turmas %}
+                                            <option value="{{ t }}" {% if turma == t %}selected{% endif %}>{{ t }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="turno" class="form-label">Turno</label>
+                                    <select class="form-select" id="turno" name="turno">
+                                        <option value="">Todos os turnos</option>
+                                        {% for t in turnos %}
+                                            <option value="{{ t }}" {% if turno == t %}selected{% endif %}>{{ t }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-3">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-filter"></i> Filtrar
+                                    </button>
+                                    <a href="{{ url_for('imprimir_qrcodes_html') }}" class="btn btn-secondary">Limpar</a>
+                                    <button type="button" class="btn btn-success" onclick="window.print()">
+                                        <i class="bi bi-printer"></i> Imprimir
+                                    </button>
+                                    <a href="{{ url_for('listar_alunos_view') }}" class="btn btn-outline-primary">
+                                        <i class="bi bi-arrow-left"></i> Voltar para Alunos
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="bi bi-info-circle"></i> Instruções</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul>
+                                <li>Esta página é otimizada para impressão em papel A4</li>
+                                <li>Cada página contém 8 QR codes (2 colunas × 4 linhas)</li>
+                                <li>Use papel adesivo A4 com 8 etiquetas (63.5×38.1mm) para etiquetas padrão</li>
+                                <li>Clique no botão <strong>Imprimir</strong> para abrir a caixa de diálogo de impressão</li>
+                                <li>Nas configurações da impressora, defina:
+                                    <ul>
+                                        <li>Papel: A4</li>
+                                        <li>Orientação: Retrato</li>
+                                        <li>Margens: Mínimas ou Nenhuma</li>
+                                        <li>Escala: 100%</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                            <div class="alert alert-info">
+                                <i class="bi bi-lightbulb"></i> <strong>Dica:</strong> Imprima uma página de teste primeiro para ajustar o alinhamento.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong> A visualização abaixo é apenas para referência. Use o botão "Imprimir" para impressão otimizada.
+        </div>
+    </div>
+    
+    <!-- Páginas de QR Codes para impressão -->
+    {% for aluno in alunos %}
+        {% if loop.index0 % 8 == 0 %}
+            <div class="qrcode-page{% if not loop.first %} page-break{% endif %}">
+                <div class="page-header print-only">
+                    <h2>QR Codes - Sistema Cantina Escolar</h2>
+                    <p>Página {{ loop.index0 // 8 + 1 }} de {{ ((alunos|length + 7) // 8) }}</p>
+                    <p>Data de geração: {{ hoje }}</p>
+                    {% if turma %}<p>Turma: {{ turma }}{% endif %}
+                    {% if turno %}<p>Turno: {{ turno }}{% endif %}
+                </div>
+                <div class="qrcode-grid">
+        {% endif %}
+        
+        <div class="qrcode-card">
+            <div>
+                <div class="student-info">
+                    <div class="student-name">{{ aluno.nome }}</div>
+                    <div class="student-details">
+                        <div>Matrícula: {{ aluno.matricula }}</div>
+                        <div>Turma: {{ aluno.turma }}</div>
+                        <div>Turno: {{ aluno.turno }}</div>
+                    </div>
+                </div>
+                {% if aluno.qrcode_hash %}
+                    <img src="{{ url_for('download_qrcode', matricula=aluno.matricula) }}" alt="QR Code {{ aluno.matricula }}" class="qrcode-img">
+                {% else %}
+                    <div class="text-danger">QR Code não gerado</div>
+                {% endif %}
+                <div class="student-details mt-2">
+                    <small>Escaneie para check-in na cantina</small>
+                </div>
+            </div>
+        </div>
+        
+        {% if loop.index0 % 8 == 7 or loop.last %}
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-warning no-print">
+            <i class="bi bi-exclamation-triangle"></i> Nenhum aluno encontrado com os filtros aplicados.
+        </div>
+    {% endfor %}
+    
+    <script>
+        // Adicionar data atual para o cabeçalho de impressão
+        document.addEventListener('DOMContentLoaded', function() {
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            // Atualizar todos os elementos com classe data-geracao
+            const dataElements = document.querySelectorAll('.data-geracao');
+            dataElements.forEach(el => {
+                el.textContent = 'Data de geração: ' + hoje;
+            });
+        });
+    </script>
+</body>
+</html>

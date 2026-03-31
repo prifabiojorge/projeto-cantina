@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="bi bi-bar-chart"></i> Relatório Diário</h1>
+        <p class="lead">Resumo dos check-ins na portaria para hoje.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Dados de Hoje</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h2 class="display-4">{{ relatorio.total }}</h2>
+                                <p class="text-muted">Alunos com check-in</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card {{ 'bg-success' if ja_enviado else 'bg-warning' }}">
+                            <div class="card-body text-center text-white">
+                                <h2 class="display-6">
+                                    {% if ja_enviado %}
+                                        <i class="bi bi-check-circle"></i> Enviado
+                                    {% else %}
+                                        <i class="bi bi-clock"></i> Pendente
+                                    {% endif %}
+                                </h2>
+                                <p class="mb-0">Status do relatório</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if relatorio.detalhes_turma or relatorio.detalhes_turno %}
+                <hr>
+                <h5 class="mt-4">Detalhamento</h5>
+                <div class="row">
+                    {% if relatorio.detalhes_turma %}
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-people"></i> Por Turma</h6>
+                        <ul class="list-group">
+                            {% for item in relatorio.detalhes_turma %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ item.turma }}
+                                <span class="badge bg-primary rounded-pill">{{ item.quantidade }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    {% if relatorio.detalhes_turno %}
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-clock"></i> Por Turno</h6>
+                        <ul class="list-group">
+                            {% for item in relatorio.detalhes_turno %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ item.turno }}
+                                <span class="badge bg-primary rounded-pill">{{ item.quantidade }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Envio WhatsApp</h5>
+            </div>
+            <div class="card-body">
+                <p>O relatório será enviado automaticamente às <strong>8h</strong> para o número configurado.</p>
+                <p>Você também pode enviar manualmente agora:</p>
+                
+                <div class="d-grid gap-2">
+                    {% if ja_enviado %}
+                    <button class="btn btn-secondary" disabled>
+                        <i class="bi bi-check-circle"></i> Relatório já enviado hoje
+                    </button>
+                    <p class="small text-muted mt-2">Aguarde até amanhã para enviar novamente.</p>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('admin_relatorio_enviar') }}">
+                        <button type="submit" class="btn btn-success btn-lg w-100">
+                            <i class="bi bi-whatsapp"></i> Enviar Relatório Agora
+                        </button>
+                    </form>
+                    <p class="small text-muted mt-2">Será enviado via WhatsApp para o administrador.</p>
+                    {% endif %}
+                </div>
+                
+                <hr>
+                <h6>Configurações</h6>
+                <ul class="small">
+                    <li>Hora automática: 8h00</li>
+                    <li>WhatsApp: {{ 'Habilitado' if config.WHATSAPP_ENABLED else 'Desabilitado' }}</li>
+                    <li>Número: {{ config.REPORT_ADMIN_PHONE or 'Não configurado' }}</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Informações</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">O relatório diário informa à cantina quantos alunos passaram pela portaria e devem receber almoço.</p>
+                <p class="small">Evita desperdício de alimentos e garante que nenhum aluno fique sem refeição.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

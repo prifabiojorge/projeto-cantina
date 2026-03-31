@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cantina - Sistema Cantina</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #fff8f0;
+        }
+        .scanner-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #reader {
+            width: 100%;
+            height: 500px;
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #000;
+        }
+        .result-card {
+            transition: all 0.3s ease;
+        }
+        .status-ok {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .status-ja_almocou {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        .status-inativo, .status-nao_encontrado, .status-sem_checkin_portaria {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .counter {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .last-scan-name {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        .turma-badge {
+            font-size: 1rem;
+        }
+        .alarm-indicator {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .alarm-green {
+            background-color: #28a745;
+            color: white;
+            animation: pulse-green 2s infinite;
+        }
+        .alarm-red {
+            background-color: #dc3545;
+            color: white;
+            animation: pulse-red 0.5s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        .sound-control {
+            cursor: pointer;
+        }
+        .alarme-ativo {
+            animation: alarme-piscar 0.5s infinite;
+        }
+        @keyframes alarme-piscar {
+            0% { background-color: #fff8f0; }
+            50% { background-color: #ffcccc; }
+            100% { background-color: #fff8f0; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-success">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-cup"></i> Cantina - Check-in Almoço
+            </a>
+            <div class="navbar-text text-white">
+                <i class="bi bi-calendar-check"></i> <span id="data-hoje"></span>
+                &nbsp;|&nbsp;
+                <i class="bi bi-volume-up"></i> <span id="sound-status">Som: ON</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Contador e Indicador -->
+            <div class="col-lg-3 col-md-4 mb-4">
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Almoços Servidos Hoje</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="counter" id="contador">0</div>
+                        <p class="text-muted mt-2">Alunos que já almoçaram hoje</p>
+                        <button class="btn btn-outline-success btn-sm" onclick="atualizarContador()">
+                            <i class="bi bi-arrow-clockwise"></i> Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-megaphone"></i> Indicador de Status</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="alarm-indicator" id="alarm-indicator">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <p class="mt-3" id="alarm-text">Pronto para ler QR Codes</p>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary sound-control" onclick="toggleSound()">
+                                <i class="bi bi-volume-up"></i> <span id="sound-toggle-text">Desligar Alarme</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="testarAlarme()">
+                                <i class="bi bi-play-circle"></i> Testar Alarme
+                            </button>
+                            <button class="btn btn-sm btn-danger mt-2" onclick="dispensarAlarme()">
+                                <i class="bi bi-volume-mute"></i> Dispensar Alarme
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instruções</h5>
+                    </div>
+                    <div class="card-body">
+                        <ol class="small">
+                            <li>Posicione o QR Code do aluno diante da câmera.</li>
+                            <li>O sistema verificará se o aluno fez check-in na portaria hoje.</li>
+                            <li><strong>Verde</strong>: Aluno liberado para almoçar.</li>
+                            <li><strong>Vermelho</strong>: Problema (aluno já almoçou, não fez check-in na portaria, ou está inativo).</li>
+                            <li>O alarme sonoro tocará em caso de tentativa irregular.</li>
+                            <li>Cada aluno pode almoçar apenas <strong>uma vez por dia</strong>.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scanner e Resultado -->
+            <div class="col-lg-9 col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-camera"></i> Scanner de QR Code</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="scanner-container">
+                            <div id="reader"></div>
+                            <div class="text-center mt-3">
+                                <button id="btn-start" class="btn btn-success">
+                                    <i class="bi bi-play-circle"></i> Iniciar Scanner
+                                </button>
+                                <button id="btn-stop" class="btn btn-danger" disabled>
+                                    <i class="bi bi-stop-circle"></i> Parar Scanner
+                                </button>
+                                <button id="btn-swap" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-repeat"></i> Trocar Câmera
+                                </button>
+                            </div>
+                            <div class="alert alert-warning mt-3 small">
+                                <i class="bi bi-exclamation-triangle"></i> Certifique‑se de que a câmera esteja focada e bem iluminada.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resultado do Último Scan -->
+                <div class="card shadow mt-4 result-card" id="result-card" style="display: none;">
+                    <div class="card-header" id="result-header">
+                        <h5 class="mb-0"><i class="bi bi-person-check"></i> Resultado do Scan</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h3 class="last-scan-name" id="aluno-nome">-</h3>
+                                <div class="mt-2">
+                                    <span class="badge bg-secondary turma-badge" id="aluno-turma">Turma</span>
+                                    <span class="badge bg-secondary turma-badge" id="aluno-turno">Turno</span>
+                                    <span class="badge bg-secondary turma-badge" id="aluno-matricula">Matrícula</span>
+                                </div>
+                                <p class="mt-3" id="aluno-status-text">Status do registro</p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="display-1" id="status-icon">
+                                    <i class="bi bi-question-circle"></i>
+                                </div>
+                                <p class="mt-2" id="status-message">Aguardando leitura...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Histórico Rápido (últimos 5) -->
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Últimos Registros</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="tabela-ultimos">
+                                <thead>
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Aluno</th>
+                                        <th>Turma</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ultimos-registros">
+                                    <!-- Preenchido via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra inferior de estatísticas em tempo real -->
+    <div class="container-fluid mt-3 mb-3">
+        <div class="row">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body py-2">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <strong>🍽️ Almoçaram:</strong> <span id="est-almocaram">0</span>/<span id="est-esperado">0</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>⏰ Hora:</strong> <span id="est-hora">--:--</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>📊 Percentual:</strong> <span id="est-percentual">0</span>%
+                            </div>
+                            <div class="col-md-3">
+                                <strong>📅 Data:</strong> <span id="est-data">--/--/----</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Áudio para alarme (fallback se alarme.mp3 não existir) -->
+    <audio id="alarm-sound" preload="auto">
+        <source src="{{ url_for('static', filename='sounds/alarme.mp3') }}" type="audio/mpeg">
+        <!-- Fallback para beep gerado por JavaScript -->
+    </audio>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
+    <script>
+        // Variáveis globais
+        let html5QrCode = null;
+        let currentCameraId = null;
+        let ultimosRegistros = [];
+        const maxUltimos = 5;
+        let soundEnabled = true;
+        let processandoScan = false; // Flag para evitar leituras duplicadas
+
+        // Data de hoje
+        document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR');
+
+        // Atualizar contador
+        function atualizarContador() {
+            fetch('/api/cantina/contagem-hoje')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('contador').textContent = data.total;
+                })
+                .catch(err => console.error('Erro ao buscar contagem:', err));
+        }
+
+        // Inicializar contador
+        atualizarContador();
+        setInterval(atualizarContador, 30000); // Atualiza a cada 30 segundos
+
+        // Configurar scanner
+        function iniciarScanner() {
+            // Inicializar áudio (necessário para contornar autoplay policy)
+            initAudio();
+            const config = { fps: 10, qrbox: { width: 500, height: 500 } };
+            
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    // Usar a câmera traseira se disponível, senão a primeira
+                    const backCamera = devices.find(d => d.label.toLowerCase().includes('back'));
+                    const cameraId = backCamera ? backCamera.id : devices[0].id;
+                    currentCameraId = cameraId;
+
+                    html5QrCode = new Html5Qrcode("reader");
+                    html5QrCode.start(
+                        cameraId,
+                        config,
+                        onScanSuccess,
+                        onScanError
+                    ).then(() => {
+                        document.getElementById('btn-start').disabled = true;
+                        document.getElementById('btn-stop').disabled = false;
+                    }).catch(err => {
+                        console.error('Erro ao iniciar scanner:', err);
+                        alert('Não foi possível iniciar a câmera. Verifique as permissões.');
+                    });
+                } else {
+                    alert('Nenhuma câmera encontrada.');
+                }
+            }).catch(err => {
+                console.error('Erro ao listar câmeras:', err);
+                alert('Não foi possível acessar as câmeras.');
+            });
+        }
+
+        function pararScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-stop').disabled = true;
+                }).catch(err => console.error('Erro ao parar scanner:', err));
+            }
+        }
+
+        function trocarCamera() {
+            if (html5QrCode) {
+                pararScanner();
+                setTimeout(iniciarScanner, 500);
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Evitar múltiplas leituras rápidas
+            if (processandoScan) {
+                return; // Ignora leitura se já está processando outra
+            }
+            processandoScan = true;
+            
+            // Enviar para o backend
+            fetch('/api/checkin-cantina', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qrcode_hash: decodedText })
+            })
+            .then(response => response.json())
+            .then(resultado => {
+                exibirResultado(resultado);
+                // Atualizar indicador de alarme
+                atualizarIndicadorAlarme(resultado.status);
+                // Registrar no histórico
+                adicionarUltimoRegistro(resultado);
+                // Atualizar contador
+                atualizarContador();
+                // Liberar para próxima leitura após 2 segundos
+                setTimeout(() => {
+                    processandoScan = false;
+                }, 2000);
+            })
+            .catch(error => {
+                console.error('Erro ao enviar check-in:', error);
+                exibirErro('Falha na comunicação com o servidor');
+                // Liberar para próxima leitura após 2 segundos
+                setTimeout(() => {
+                    processandoScan = false;
+                }, 2000);
+            });
+        }
+
+        function onScanError(error) {
+            // Ignorar erros comuns (ex: nenhum QR code encontrado)
+            // console.warn('Erro no scanner:', error);
+        }
+
+        function exibirResultado(resultado) {
+            const card = document.getElementById('result-card');
+            const header = document.getElementById('result-header');
+            const icon = document.getElementById('status-icon');
+            const message = document.getElementById('status-message');
+            const aluno = resultado.aluno;
+
+            // Resetar classes
+            card.className = 'card shadow mt-4 result-card';
+            header.className = 'card-header';
+            icon.className = 'display-1';
+
+            if (resultado.status === 'ok') {
+                card.classList.add('status-ok');
+                header.classList.add('bg-success', 'text-white');
+                icon.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+                message.textContent = 'Aluno autorizado! Bom apetite.';
+                message.className = 'text-success';
+                playBipSucesso();
+            } else if (resultado.status === 'ja_almocou') {
+                card.classList.add('status-ja_almocou');
+                header.classList.add('bg-warning', 'text-dark');
+                icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning"></i>';
+                message.textContent = 'Aluno já almoçou hoje.';
+                message.className = 'text-warning';
+                playAlarme();
+            } else if (resultado.status === 'inativo') {
+                card.classList.add('status-inativo');
+                header.classList.add('bg-danger', 'text-white');
+                icon.innerHTML = '<i class="bi bi-x-circle-fill text-danger"></i>';
+                message.textContent = 'Aluno inativo. Contate a administração.';
+                message.className = 'text-danger';
+            } else if (resultado.status === 'sem_checkin_portaria') {
+                card.classList.add('status-sem_checkin_portaria');
+                header.classList.add('bg-danger', 'text-white');
+                icon.innerHTML = '<i class="bi bi-door-closed text-danger"></i>';
+                message.textContent = 'Aluno não fez check-in na portaria hoje.';
+                message.className = 'text-danger';
+            } else { // nao_encontrado
+                card.classList.add('status-nao_encontrado');
+                header.classList.add('bg-danger', 'text-white');
+                icon.innerHTML = '<i class="bi bi-question-circle-fill text-danger"></i>';
+                message.textContent = 'QR Code não reconhecido.';
+                message.className = 'text-danger';
+            }
+
+            // Preencher dados do aluno (se disponível)
+            if (aluno) {
+                document.getElementById('aluno-nome').textContent = aluno.nome;
+                document.getElementById('aluno-turma').textContent = aluno.turma;
+                document.getElementById('aluno-turno').textContent = aluno.turno;
+                document.getElementById('aluno-matricula').textContent = aluno.matricula;
+                document.getElementById('aluno-status-text').textContent = 
+                    `Aluno ${aluno.ativo ? 'ativo' : 'inativo'} - QR: ${aluno.qrcode_hash.substring(0, 8)}...`;
+            } else {
+                document.getElementById('aluno-nome').textContent = 'NÃO IDENTIFICADO';
+                document.getElementById('aluno-turma').textContent = '--';
+                document.getElementById('aluno-turno').textContent = '--';
+                document.getElementById('aluno-matricula').textContent = '--';
+                document.getElementById('aluno-status-text').textContent = 'QR Code não corresponde a nenhum aluno cadastrado.';
+            }
+
+            card.style.display = 'block';
+        }
+
+        function exibirErro(mensagem) {
+            const card = document.getElementById('result-card');
+            const header = document.getElementById('result-header');
+            const icon = document.getElementById('status-icon');
+            const message = document.getElementById('status-message');
+
+            card.className = 'card shadow mt-4 result-card status-nao_encontrado';
+            header.className = 'card-header bg-danger text-white';
+            icon.innerHTML = '<i class="bi bi-exclamation-octagon-fill text-danger"></i>';
+            message.textContent = mensagem;
+            message.className = 'text-danger';
+
+            document.getElementById('aluno-nome').textContent = 'ERRO';
+            document.getElementById('aluno-turma').textContent = '--';
+            document.getElementById('aluno-turno').textContent = '--';
+            document.getElementById('aluno-matricula').textContent = '--';
+            document.getElementById('aluno-status-text').textContent = 'Tente novamente ou verifique a conexão.';
+
+            card.style.display = 'block';
+        }
+
+        function atualizarIndicadorAlarme(status) {
+            const indicator = document.getElementById('alarm-indicator');
+            const alarmText = document.getElementById('alarm-text');
+            
+            // Reset classes
+            indicator.className = 'alarm-indicator';
+            
+            if (status === 'ok') {
+                indicator.classList.add('alarm-green');
+                indicator.innerHTML = '<i class="bi bi-check-circle"></i>';
+                alarmText.textContent = 'LIBERADO - Aluno autorizado';
+            } else {
+                indicator.classList.add('alarm-red');
+                indicator.innerHTML = '<i class="bi bi-exclamation-triangle"></i>';
+                alarmText.textContent = 'BLOQUEADO - Verificar situação';
+            }
+        }
+
+        function deveTocarAlarme(status) {
+            // Tocar alarme para situações problemáticas (exceto "ok")
+            return status !== 'ok' && soundEnabled;
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const statusEl = document.getElementById('sound-status');
+            const toggleText = document.getElementById('sound-toggle-text');
+            if (soundEnabled) {
+                statusEl.textContent = 'Som: ON';
+                toggleText.textContent = 'Desligar Alarme';
+            } else {
+                statusEl.textContent = 'Som: OFF';
+                toggleText.textContent = 'Ligar Alarme';
+            }
+        }
+
+        function testarAlarme() {
+            initAudio();
+            playAlarme();
+            // Simular indicador vermelho
+            const indicator = document.getElementById('alarm-indicator');
+            indicator.className = 'alarm-indicator alarm-red';
+            indicator.innerHTML = '<i class="bi bi-exclamation-triangle"></i>';
+            document.getElementById('alarm-text').textContent = 'TESTE - Alarme sonoro ativado';
+            setTimeout(() => {
+                stopAlarme();
+            }, 2000);
+        }
+
+        function dispensarAlarme() {
+            stopAlarme();
+            document.getElementById('alarm-text').textContent = 'Alarme dispensado';
+            // Reiniciar scanner após dispensar alarme
+            setTimeout(() => {
+                if (html5QrCode && currentCameraId) {
+                    html5QrCode.resume();
+                }
+            }, 500);
+        }
+
+        function atualizarEstatisticas() {
+            fetch('/api/cantina/estatisticas')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('est-almocaram').textContent = data.total_almocaram;
+                    document.getElementById('est-esperado').textContent = data.total_esperado;
+                    document.getElementById('est-hora').textContent = data.hora_atual;
+                    document.getElementById('est-percentual').textContent = data.percentual;
+                    // Format date to DD/MM/YYYY
+                    const [year, month, day] = data.data.split('-');
+                    document.getElementById('est-data').textContent = `${day}/${month}/${year}`;
+                })
+                .catch(err => console.error('Erro ao buscar estatísticas:', err));
+        }
+
+        // Inicializar estatísticas
+        atualizarEstatisticas();
+        setInterval(atualizarEstatisticas, 30000); // Atualiza a cada 30 segundos
+
+        function adicionarUltimoRegistro(resultado) {
+            const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const aluno = resultado.aluno;
+            
+            const registro = {
+                hora: agora,
+                nome: aluno ? aluno.nome : 'Desconhecido',
+                turma: aluno ? aluno.turma : '--',
+                status: resultado.status
+            };
+
+            ultimosRegistros.unshift(registro);
+            if (ultimosRegistros.length > maxUltimos) {
+                ultimosRegistros.pop();
+            }
+
+            atualizarTabelaUltimos();
+        }
+
+        function atualizarTabelaUltimos() {
+            const tbody = document.getElementById('ultimos-registros');
+            tbody.innerHTML = '';
+
+            ultimosRegistros.forEach(reg => {
+                let statusBadge = '';
+                if (reg.status === 'ok') {
+                    statusBadge = '<span class="badge bg-success">Autorizado</span>';
+                } else if (reg.status === 'ja_almocou') {
+                    statusBadge = '<span class="badge bg-warning text-dark">Já almoçou</span>';
+                } else if (reg.status === 'inativo') {
+                    statusBadge = '<span class="badge bg-danger">Inativo</span>';
+                } else if (reg.status === 'sem_checkin_portaria') {
+                    statusBadge = '<span class="badge bg-danger">Sem check-in</span>';
+                } else {
+                    statusBadge = '<span class="badge bg-secondary">Não reconhecido</span>';
+                }
+
+                const row = `
+                    <tr>
+                        <td>${reg.hora}</td>
+                        <td>${reg.nome}</td>
+                        <td>${reg.turma}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('btn-start').addEventListener('click', iniciarScanner);
+        document.getElementById('btn-stop').addEventListener('click', pararScanner);
+        document.getElementById('btn-swap').addEventListener('click', trocarCamera);
+
+        // Inicializar indicador
+        atualizarIndicadorAlarme('ok');
+    </script>
+</body>
+</html>

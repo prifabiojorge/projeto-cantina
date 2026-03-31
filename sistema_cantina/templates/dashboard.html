@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard Administrativo</h1>
+    
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <!-- Card 1: Progresso de Almoços (com barra de progresso) -->
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-check-circle"></i> Progresso de Almoços</h5>
+                    <p class="card-text display-4">{{ dashboard.cards.progresso_almoco.label }}</p>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ dashboard.cards.progresso_almoco.percentual }}%;" 
+                             aria-valuenow="{{ dashboard.cards.progresso_almoco.percentual }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ dashboard.cards.progresso_almoco.percentual }}%
+                        </div>
+                    </div>
+                    <small class="mt-2 d-block">{{ dashboard.cards.progresso_almoco.valor_atual }} de {{ dashboard.cards.progresso_almoco.valor_total }} alunos</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card 2: Desperdício Evitado -->
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-recycle"></i> Desperdício Evitado</h5>
+                    <p class="card-text display-4">{{ dashboard.cards.desperdicio_evitado.percentual }}%</p>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-warning" role="progressbar" 
+                             style="width: {{ dashboard.cards.desperdicio_evitado.percentual }}%;" 
+                             aria-valuenow="{{ dashboard.cards.desperdicio_evitado.percentual }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ dashboard.cards.desperdicio_evitado.percentual }}%
+                        </div>
+                    </div>
+                    <small class="mt-2 d-block">{{ dashboard.cards.desperdicio_evitado.potencial }} desperdícios potenciais</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card 3: Check-ins Portaria -->
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-door-closed"></i> Check-ins Portaria</h5>
+                    <p class="card-text display-4">{{ dashboard.cards.checkins_portaria.valor }}</p>
+                    <small>Alunos que passaram pela portaria hoje</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card 4: Check-ins Cantina -->
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cup"></i> Check-ins Cantina</h5>
+                    <p class="card-text display-4">{{ dashboard.cards.checkins_cantina.valor }}</p>
+                    <small>Almoços servidos hoje</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráficos -->
+    <div class="row mb-4">
+        <!-- Gráfico de barras: histórico semanal -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-bar-chart"></i> Histórico de Check-ins (Últimos 7 dias)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartCheckins" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráfico de pizza: almoços por turma hoje -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-pie-chart"></i> Almoços por Turma (Hoje)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartTurmasHoje" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Últimas Atividades e Histórico Diário -->
+    <div class="row">
+        <!-- Últimas Atividades -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-activity"></i> Últimas Atividades</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Aluno</th>
+                                    <th>Turma</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for atividade in dashboard.ultimas_atividades %}
+                                <tr>
+                                    <td>{{ atividade.hora_display }}</td>
+                                    <td>
+                                        {% if atividade.tipo == 'portaria' %}
+                                            <span class="badge bg-primary">Portaria</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Cantina</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ atividade.nome }}</td>
+                                    <td>{{ atividade.turma }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tabela de Histórico Diário -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-calendar-week"></i> Histórico Diário</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Check-ins Portaria</th>
+                                    <th>Almoços Servidos</th>
+                                    <th>Alunos sem Almoço</th>
+                                    <th>Taxa de Consumo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dia in historico %}
+                                <tr>
+                                    <td>{{ dia.data }}</td>
+                                    <td>{{ dia.portaria }}</td>
+                                    <td>{{ dia.cantina }}</td>
+                                    <td>{{ dia.sem_almoco }}</td>
+                                    <td>
+                                        {% if dia.portaria > 0 %}
+                                            {{ ((dia.cantina / dia.portaria) * 100)|round(1) }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dados para gráficos
+    const historico = {{ historico|tojson }};
+    const dashboardData = {{ dashboard|tojson }};
+    
+    // Gráfico de linha: histórico de check-ins
+    const ctxLine = document.getElementById('chartCheckins').getContext('2d');
+    new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: historico.map(d => d.data),
+            datasets: [
+                {
+                    label: 'Check-ins Portaria',
+                    data: historico.map(d => d.portaria),
+                    borderColor: 'rgb(54, 162, 235)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    tension: 0.2
+                },
+                {
+                    label: 'Almoços Servidos',
+                    data: historico.map(d => d.cantina),
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.2
+                },
+                {
+                    label: 'Alunos sem Almoço',
+                    data: historico.map(d => d.sem_almoco),
+                    borderColor: 'rgb(255, 159, 64)',
+                    backgroundColor: 'rgba(255, 159, 64, 0.1)',
+                    tension: 0.2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Quantidade' }
+                }
+            }
+        }
+    });
+    
+    // Gráfico de pizza: almoços por turma hoje
+    const ctxPie = document.getElementById('chartTurmasHoje').getContext('2d');
+    new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: dashboardData.grafico_turmas.turmas,
+            datasets: [{
+                data: dashboardData.grafico_turmas.quantidades,
+                backgroundColor: dashboardData.grafico_turmas.cores
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'right' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} almoços (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Auto-refresh do dashboard a cada 60 segundos
+    let autoRefreshInterval = null;
+    
+    function atualizarDashboard() {
+        fetch('/api/dashboard')
+            .then(response => response.json())
+            .then(data => {
+                // Atualizar cards
+                document.querySelector('.card.text-white.bg-primary .display-4').textContent = 
+                    data.cards.progresso_almoco.label;
+                document.querySelector('.card.text-white.bg-primary .progress-bar').style.width = 
+                    data.cards.progresso_almoco.percentual + '%';
+                document.querySelector('.card.text-white.bg-primary .progress-bar').textContent = 
+                    data.cards.progresso_almoco.percentual + '%';
+                document.querySelector('.card.text-white.bg-primary small').textContent = 
+                    data.cards.progresso_almoco.valor_atual + ' de ' + data.cards.progresso_almoco.valor_total + ' alunos';
+                
+                document.querySelector('.card.text-white.bg-success .display-4').textContent = 
+                    data.cards.desperdicio_evitado.percentual + '%';
+                document.querySelector('.card.text-white.bg-success .progress-bar').style.width = 
+                    data.cards.desperdicio_evitado.percentual + '%';
+                document.querySelector('.card.text-white.bg-success .progress-bar').textContent = 
+                    data.cards.desperdicio_evitado.percentual + '%';
+                document.querySelector('.card.text-white.bg-success small').textContent = 
+                    data.cards.desperdicio_evitado.potencial + ' desperdícios potenciais';
+                
+                document.querySelector('.card.text-white.bg-info .display-4').textContent = 
+                    data.cards.checkins_portaria.valor;
+                document.querySelector('.card.text-white.bg-warning .display-4').textContent = 
+                    data.cards.checkins_cantina.valor;
+                
+                // Atualizar gráfico de pizza (se houver mudanças)
+                // Para simplificar, recriamos o gráfico
+                if (window.turmasChart) {
+                    window.turmasChart.destroy();
+                }
+                window.turmasChart = new Chart(ctxPie, {
+                    type: 'pie',
+                    data: {
+                        labels: data.grafico_turmas.turmas,
+                        datasets: [{
+                            data: data.grafico_turmas.quantidades,
+                            backgroundColor: data.grafico_turmas.cores
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'right' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return `${label}: ${value} almoços (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Atualizar tabela de últimas atividades
+                // Para simplificar, recarregamos a página após 5 ciclos
+                if (window.refreshCount === undefined) window.refreshCount = 0;
+                window.refreshCount++;
+                if (window.refreshCount >= 5) {
+                    location.reload(); // Recarrega para pegar histórico atualizado
+                }
+            })
+            .catch(error => console.error('Erro ao atualizar dashboard:', error));
+    }
+    
+    // Iniciar auto-refresh
+    autoRefreshInterval = setInterval(atualizarDashboard, 60000); // 60 segundos
+    
+    // Opcional: permitir pausar o auto-refresh ao passar o mouse
+    document.addEventListener('DOMContentLoaded', function() {
+        const dashboardSection = document.querySelector('.container-fluid');
+        dashboardSection.addEventListener('mouseenter', () => {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        });
+        dashboardSection.addEventListener('mouseleave', () => {
+            if (!autoRefreshInterval) {
+                autoRefreshInterval = setInterval(atualizarDashboard, 60000);
+            }
+        });
+    });
+</script>
+{% endblock %}

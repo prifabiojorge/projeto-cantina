@@ -1,0 +1,197 @@
+{
+  "cards": {
+    "checkins_cantina": {
+      "label": "Check-ins Cantina",
+      "valor": 409
+    },
+    "checkins_portaria": {
+      "label": "Check-ins Portaria",
+      "valor": 415
+    },
+    "desperdicio_evitado": {
+      "label": "98% evitado",
+      "percentual": 98,
+      "potencial": 6
+    },
+    "progresso_almoco": {
+      "label": "409/415",
+      "percentual": 98,
+      "valor_atual": 409,
+      "valor_total": 415
+    }
+  },
+  "estatisticas_gerais": {
+    "alunos_por_turma": [
+      {
+        "quantidade": 68,
+        "turma": "1\u00baA"
+      },
+      {
+        "quantidade": 78,
+        "turma": "1\u00baB"
+      },
+      {
+        "quantidade": 67,
+        "turma": "2\u00baA"
+      },
+      {
+        "quantidade": 70,
+        "turma": "2\u00baB"
+      },
+      {
+        "quantidade": 58,
+        "turma": "3\u00baA"
+      },
+      {
+        "quantidade": 79,
+        "turma": "3\u00baB"
+      }
+    ],
+    "alunos_por_turno": [
+      {
+        "quantidade": 135,
+        "turno": "Integral"
+      },
+      {
+        "quantidade": 144,
+        "turno": "Manh\u00e3"
+      },
+      {
+        "quantidade": 141,
+        "turno": "Tarde"
+      }
+    ],
+    "cantina_hoje": 409,
+    "data_hoje": "2026-03-27",
+    "esperados_almoco": 6,
+    "portaria_hoje": 415,
+    "total_alunos_ativos": 420
+  },
+  "grafico_turmas": {
+    "cores": [
+      "#FF6384",
+      "#36A2EB",
+      "#FFCE56",
+      "#4BC0C0",
+      "#9966FF",
+      "#FF9F40"
+    ],
+    "quantidades": [
+      66,
+      78,
+      63,
+      68,
+      58,
+      76
+    ],
+    "turmas": [
+      "1\u00baA",
+      "1\u00baB",
+      "2\u00baA",
+      "2\u00baB",
+      "3\u00baA",
+      "3\u00baB"
+    ]
+  },
+  "historico_semanal": {
+    "cantina": [
+      0,
+      0,
+      30,
+      250,
+      395,
+      392,
+      409
+    ],
+    "datas": [
+      "2026-03-21",
+      "2026-03-22",
+      "2026-03-23",
+      "2026-03-24",
+      "2026-03-25",
+      "2026-03-26",
+      "2026-03-27"
+    ],
+    "portaria": [
+      0,
+      0,
+      36,
+      325,
+      414,
+      411,
+      415
+    ]
+  },
+  "ultimas_atividades": [
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Beatriz Costa",
+      "tipo": "portaria",
+      "turma": "3\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Samuel Ribeiro",
+      "tipo": "portaria",
+      "turma": "1\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Henrique Moreira",
+      "tipo": "portaria",
+      "turma": "3\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Benjamin Mendes",
+      "tipo": "portaria",
+      "turma": "2\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Joaquim Ara\u00fajo",
+      "tipo": "portaria",
+      "turma": "3\u00baA"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Amanda Carvalho",
+      "tipo": "portaria",
+      "turma": "1\u00baA"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Leonardo Dias",
+      "tipo": "portaria",
+      "turma": "1\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Mariana Pereira",
+      "tipo": "portaria",
+      "turma": "3\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Joaquim Ara\u00fajo",
+      "tipo": "portaria",
+      "turma": "3\u00baB"
+    },
+    {
+      "hora": "2026-03-27 13:30:00",
+      "hora_display": "13:30:00",
+      "nome": "Felipe Rodrigues",
+      "tipo": "portaria",
+      "turma": "3\u00baB"
+    }
+  ]
+}

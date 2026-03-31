@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Banco de dados SQLite
+*.db
+*.db.backup
+*.sqlite3
+
+# QR codes gerados
+sistema_cantina/qrcodes_alunos/
+
+# Logs
+*.log
+*.txt
+!README.md
+!**/README.md
+
+# PDFs gerados
+qrcodes_teste.pdf
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.json.tmp
+nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Variáveis de ambiente
+.env
+.env.local
+
+# Flask
+instance/
+
+# Agents/Skills (submódulos)
+.agents/

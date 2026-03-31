@@ -1,0 +1,45 @@
+/* Estilos personalizados para o Sistema Cantina */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.card {
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.btn-group .btn {
+    border-radius: 5px !important;
+    margin-right: 5px;
+}
+
+.alert a {
+    text-decoration: underline;
+}
+
+.alert a:hover {
+    text-decoration: none;
+}

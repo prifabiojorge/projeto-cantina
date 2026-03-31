@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="bi bi-gear"></i> Configurações do Sistema</h1>
+        <p class="lead">Ajuste as configurações do sistema da cantina escolar.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> Parâmetros</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin_configuracoes') }}">
+                    {% for cfg in configuracoes %}
+                    <div class="mb-3">
+                        <label for="{{ cfg.chave }}" class="form-label">
+                            <strong>{{ cfg.descricao }}</strong>
+                        </label>
+                        
+                        {% if cfg.chave.endswith('enabled') or cfg.chave.endswith('habilitado') or cfg.chave.endswith('som') or cfg.chave.endswith('visual') %}
+                        {# Campo booleano (checkbox) #}
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" 
+                                   id="{{ cfg.chave }}" name="{{ cfg.chave }}"
+                                   value="true" {{ 'checked' if cfg.valor == 'true' else '' }}>
+                            <label class="form-check-label" for="{{ cfg.chave }}">
+                                {{ 'Habilitado' if cfg.valor == 'true' else 'Desabilitado' }}
+                            </label>
+                        </div>
+                        
+                        {% elif cfg.chave.endswith('hour') or cfg.chave.endswith('minute') or cfg.chave.endswith('dias') %}
+                        {# Campo numérico #}
+                        <input type="number" class="form-control" id="{{ cfg.chave }}" 
+                               name="{{ cfg.chave }}" value="{{ cfg.valor }}" 
+                               min="0" {% if cfg.chave.endswith('hour') %}max="23"{% elif cfg.chave.endswith('minute') %}max="59"{% endif %}>
+                        
+                        {% else %}
+                        {# Campo texto #}
+                        <input type="text" class="form-control" id="{{ cfg.chave }}" 
+                               name="{{ cfg.chave }}" value="{{ cfg.valor }}">
+                        {% endif %}
+                        
+                        <div class="form-text">
+                            <small class="text-muted">Chave: <code>{{ cfg.chave }}</code> • Atualizado em: {{ cfg.atualizado_em or 'Nunca' }}</small>
+                        </div>
+                    </div>
+                    {% if not loop.last %}
+                    <hr>
+                    {% endif %}
+                    {% endfor %}
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instruções</h5>
+            </div>
+            <div class="card-body">
+                <p class="small"><strong>WhatsApp</strong>: Configure o número de telefone no formato internacional (ex: +5511999999999).</p>
+                <p class="small"><strong>Hora automática</strong>: A hora do envio automático do relatório diário (0‑23).</p>
+                <p class="small"><strong>Minuto automático</strong>: O minuto do envio automático (0‑59).</p>
+                <p class="small"><strong>Alarme sonoro/visual</strong>: Controla os alertas no scanner da cantina.</p>
+                <p class="small"><strong>Dias de histórico</strong>: Número de dias exibidos nos gráficos do dashboard.</p>
+                <hr>
+                <p class="small text-muted">As configurações são salvas no banco de dados e aplicadas imediatamente.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Cuidado</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">Alterações nas configurações podem afetar o funcionamento do sistema.</p>
+                <p class="small">Certifique‑se de testar as mudanças após salvar.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
