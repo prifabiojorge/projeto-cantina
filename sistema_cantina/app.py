@@ -630,6 +630,27 @@ def api_relatorio_gerar_agora():
             'mensagem': f'Erro interno: {str(e)}'
         }), 500
 
+@app.route('/api/whatsapp/teste', methods=['POST'])
+def api_whatsapp_teste():
+    """Envia mensagem de teste via WhatsApp (CallMeBot)."""
+    from whatsapp_sender import enviar_whatsapp_callmebot
+    import json as _json
+    try:
+        config_path = Path(__file__).parent / 'config_escola.json'
+        with open(config_path, 'r', encoding='utf-8') as f:
+            cfg = _json.load(f)
+        wa = cfg.get('whatsapp', {})
+        phone = wa.get('numero_telefone', '')
+        apikey = wa.get('callmebot_apikey', '')
+        if not phone or not apikey:
+            return jsonify({'sucesso': False, 'mensagem': 'Phone ou API key não configurados.'}), 400
+        msg = f"🧪 Teste do Sistema Cantina - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
+        ok = enviar_whatsapp_callmebot(phone, apikey, msg)
+        return jsonify({'sucesso': ok, 'mensagem': 'Mensagem enviada!' if ok else 'Falha ao enviar.'})
+    except Exception as e:
+        app.logger.error(f'Erro no teste WhatsApp: {e}')
+        return jsonify({'sucesso': False, 'mensagem': str(e)}), 500
+
 @app.route('/admin/configuracoes', methods=['GET', 'POST'])
 def admin_configuracoes():
     """Página de administração de configurações do sistema (JSON-based)."""

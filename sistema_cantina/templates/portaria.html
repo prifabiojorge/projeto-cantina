@@ -86,12 +86,14 @@
                 <!-- Botão Enviar Relatório WhatsApp -->
                 <div class="card shadow mt-4">
                     <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Enviar Relatório Agora</h5>
+                        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp</h5>
                     </div>
                     <div class="card-body text-center">
-                        <p class="small text-muted mb-3">Envie o relatório de previsão de almoços para o WhatsApp agora, sem esperar o agendamento automático.</p>
+                        <button class="btn btn-outline-success btn-sm w-100 mb-2" onclick="enviarTesteWhatsApp()">
+                            🧪 Enviar Mensagem de Teste
+                        </button>
                         <button class="btn btn-success btn-lg w-100" id="btn-enviar-whatsapp" onclick="enviarRelatorioWhatsApp()">
-                            <i class="bi bi-whatsapp"></i> Enviar Relatório WhatsApp
+                            <i class="bi bi-whatsapp"></i> Enviar Relatório Agora
                         </button>
                         <div id="whatsapp-status" class="mt-3" style="display: none;"></div>
                     </div>
@@ -432,6 +434,32 @@
                     </tr>
                 `;
                 tbody.innerHTML += row;
+            });
+        }
+
+        // Enviar mensagem de teste WhatsApp
+        function enviarTesteWhatsApp() {
+            const statusDiv = document.getElementById('whatsapp-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Enviando teste...</div>';
+
+            fetch('/api/whatsapp/teste', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.sucesso) {
+                    statusDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> <strong>Teste enviado!</strong> Verifique seu WhatsApp.</div>';
+                } else {
+                    statusDiv.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> ' + data.mensagem + '</div>';
+                }
+            })
+            .catch(err => {
+                statusDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ' + err + '</div>';
+            })
+            .finally(() => {
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 10000);
             });
         }
 
