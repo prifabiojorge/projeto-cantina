@@ -26,6 +26,7 @@ sistema_cantina/qrcodes_alunos/
 *.txt
 !README.md
 !**/README.md
+!requirements.txt
 
 # PDFs gerados
 qrcodes_teste.pdf
