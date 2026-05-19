@@ -13,6 +13,8 @@ def init_db():
     
     cursor.execute('PRAGMA foreign_keys = ON')
     cursor.execute('PRAGMA journal_mode = WAL')
+    cursor.execute('PRAGMA synchronous = NORMAL')
+    cursor.execute('PRAGMA busy_timeout = 5000')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS alunos (
@@ -48,15 +50,40 @@ def init_db():
             FOREIGN KEY (aluno_id) REFERENCES alunos(id)
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS liberacoes_forcadas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            aluno_id INTEGER NOT NULL,
+            data DATE NOT NULL,
+            hora_liberacao DATETIME NOT NULL,
+            motivo TEXT NOT NULL,
+            usuario_responsavel TEXT,
+            criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(aluno_id, data),
+            FOREIGN KEY (aluno_id) REFERENCES alunos(id)
+        )
+    ''')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS relatorios_enviados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             data DATE UNIQUE NOT NULL,
             total_esperado INTEGER NOT NULL,
-            enviado_em DATETIME NOT NULL
+            enviado_em DATETIME,
+            status TEXT DEFAULT 'enviado',
+            mensagem TEXT
         )
     ''')
+
+    for alter_sql in (
+        "ALTER TABLE relatorios_enviados ADD COLUMN status TEXT DEFAULT 'enviado'",
+        "ALTER TABLE relatorios_enviados ADD COLUMN mensagem TEXT",
+    ):
+        try:
+            cursor.execute(alter_sql)
+        except sqlite3.OperationalError:
+            pass
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS configuracoes (

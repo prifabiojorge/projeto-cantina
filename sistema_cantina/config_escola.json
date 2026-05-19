@@ -20,8 +20,7 @@
     "horario_envio": "08:00",
     "grupo_id": "",
     "metodo": "callmebot",
-    "numero_telefone": "559185140988",
-    "callmebot_apikey": "5144177"
+    "numero_telefone": ""
   },
   "sistema": {
     "alarme_som": true,

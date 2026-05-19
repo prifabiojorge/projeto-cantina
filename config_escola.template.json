@@ -1,0 +1,20 @@
+{
+  "escola": {
+    "nome": "Escola Municipal",
+    "turmas": ["1ºA", "1ºB", "2ºA", "2ºB", "3ºA", "3ºB"],
+    "turnos": ["Manhã", "Tarde", "Integral"]
+  },
+  "whatsapp": {
+    "habilitado": false,
+    "horario_envio": "08:00",
+    "grupo_id": "",
+    "metodo": "callmebot",
+    "numero_telefone": ""
+  },
+  "sistema": {
+    "alarme_som": true,
+    "alarme_visual": true,
+    "dias_historico": 7,
+    "backup_automatico": false
+  }
+}

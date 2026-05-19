@@ -25,7 +25,7 @@
         .result-card {
             transition: all 0.3s ease;
         }
-        .status-ok {
+        .status-ok, .status-liberado_forcado {
             background-color: #d4edda;
             border-color: #c3e6cb;
             color: #155724;
@@ -147,6 +147,23 @@
                             <button class="btn btn-sm btn-danger mt-2" onclick="dispensarAlarme()">
                                 <i class="bi bi-volume-mute"></i> Dispensar Alarme
                             </button>
+                        </div>
+                        <div id="liberacao-forcada-box" class="alert alert-warning mt-3" style="display: none;">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-5">
+                                    <label for="liberacao-motivo" class="form-label mb-1">Motivo</label>
+                                    <input type="text" class="form-control" id="liberacao-motivo" maxlength="255" placeholder="Ex: esquecimento na portaria">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="liberacao-responsavel" class="form-label mb-1">Responsável</label>
+                                    <input type="text" class="form-control" id="liberacao-responsavel" maxlength="120" placeholder="Nome ou matrícula">
+                                </div>
+                                <div class="col-md-3 d-grid">
+                                    <button type="button" class="btn btn-warning" id="btn-liberacao-forcada" onclick="registrarLiberacaoForcada()">
+                                        <i class="bi bi-unlock"></i> Liberar
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -292,6 +309,7 @@
         const maxUltimos = 5;
         let soundEnabled = true;
         let processandoScan = false; // Flag para evitar leituras duplicadas
+        let ultimoQrCode = null;
 
         // Data de hoje
         document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR');
@@ -367,6 +385,7 @@
                 return; // Ignora leitura se já está processando outra
             }
             processandoScan = true;
+            ultimoQrCode = decodedText;
             
             // Enviar para o backend
             fetch('/api/checkin-cantina', {
@@ -414,12 +433,16 @@
             card.className = 'card shadow mt-4 result-card';
             header.className = 'card-header';
             icon.className = 'display-1';
+            document.getElementById('liberacao-forcada-box').style.display = 'none';
+            document.getElementById('btn-liberacao-forcada').disabled = false;
 
-            if (resultado.status === 'ok') {
+            if (resultado.status === 'ok' || resultado.status === 'liberado_forcado') {
                 card.classList.add('status-ok');
                 header.classList.add('bg-success', 'text-white');
                 icon.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
-                message.textContent = 'Aluno autorizado! Bom apetite.';
+                message.textContent = resultado.status === 'liberado_forcado'
+                    ? 'Aluno liberado manualmente.'
+                    : 'Aluno autorizado! Bom apetite.';
                 message.className = 'text-success';
                 playBipSucesso();
             } else if (resultado.status === 'ja_almocou') {
@@ -441,6 +464,22 @@
                 icon.innerHTML = '<i class="bi bi-door-closed text-danger"></i>';
                 message.textContent = 'Aluno não fez check-in na portaria hoje.';
                 message.className = 'text-danger';
+                if (aluno) {
+                    document.getElementById('liberacao-forcada-box').style.display = 'block';
+                }
+            } else if (resultado.status === 'motivo_invalido') {
+                card.classList.add('status-sem_checkin_portaria');
+                header.classList.add('bg-danger', 'text-white');
+                icon.innerHTML = '<i class="bi bi-pencil-square text-danger"></i>';
+                message.textContent = resultado.mensagem || 'Motivo inválido.';
+                message.className = 'text-danger';
+                document.getElementById('liberacao-forcada-box').style.display = 'block';
+            } else if (resultado.status === 'ja_liberado') {
+                card.classList.add('status-ja_almocou');
+                header.classList.add('bg-warning', 'text-dark');
+                icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning"></i>';
+                message.textContent = 'Aluno já teve liberação registrada hoje.';
+                message.className = 'text-warning';
             } else { // nao_encontrado
                 card.classList.add('status-nao_encontrado');
                 header.classList.add('bg-danger', 'text-white');
@@ -489,6 +528,53 @@
             card.style.display = 'block';
         }
 
+        function registrarLiberacaoForcada() {
+            const motivo = document.getElementById('liberacao-motivo').value.trim();
+            const responsavel = document.getElementById('liberacao-responsavel').value.trim();
+            const botao = document.getElementById('btn-liberacao-forcada');
+            if (!ultimoQrCode) {
+                alert('Leia o QR Code novamente antes de liberar.');
+                return;
+            }
+            if (motivo.length < 3) {
+                alert('Informe um motivo com pelo menos 3 caracteres.');
+                return;
+            }
+
+            botao.disabled = true;
+            fetch('/api/cantina/liberacao-forcada', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    qrcode_hash: ultimoQrCode,
+                    motivo: motivo,
+                    responsavel: responsavel
+                })
+            })
+            .then(response => response.json())
+            .then(resultado => {
+                exibirResultado(resultado);
+                atualizarIndicadorAlarme(resultado.status);
+                adicionarUltimoRegistro(resultado);
+                atualizarContador();
+                atualizarEstatisticas();
+                if (resultado.status === 'liberado_forcado') {
+                    document.getElementById('liberacao-motivo').value = '';
+                    document.getElementById('liberacao-responsavel').value = '';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao registrar liberação:', error);
+                exibirErro('Falha ao registrar liberação forçada.');
+            })
+            .finally(() => {
+                botao.disabled = false;
+                setTimeout(() => {
+                    processandoScan = false;
+                }, 500);
+            });
+        }
+
         function atualizarIndicadorAlarme(status) {
             const indicator = document.getElementById('alarm-indicator');
             const alarmText = document.getElementById('alarm-text');
@@ -496,10 +582,12 @@
             // Reset classes
             indicator.className = 'alarm-indicator';
             
-            if (status === 'ok') {
+            if (status === 'ok' || status === 'liberado_forcado') {
                 indicator.classList.add('alarm-green');
                 indicator.innerHTML = '<i class="bi bi-check-circle"></i>';
-                alarmText.textContent = 'LIBERADO - Aluno autorizado';
+                alarmText.textContent = status === 'liberado_forcado'
+                    ? 'LIBERADO MANUALMENTE - Registro com justificativa'
+                    : 'LIBERADO - Aluno autorizado';
             } else {
                 indicator.classList.add('alarm-red');
                 indicator.innerHTML = '<i class="bi bi-exclamation-triangle"></i>';
@@ -509,7 +597,7 @@
 
         function deveTocarAlarme(status) {
             // Tocar alarme para situações problemáticas (exceto "ok")
-            return status !== 'ok' && soundEnabled;
+            return status !== 'ok' && status !== 'liberado_forcado' && soundEnabled;
         }
 
         function toggleSound() {
@@ -595,6 +683,8 @@
                 let statusBadge = '';
                 if (reg.status === 'ok') {
                     statusBadge = '<span class="badge bg-success">Autorizado</span>';
+                } else if (reg.status === 'liberado_forcado') {
+                    statusBadge = '<span class="badge bg-success">Liberação forçada</span>';
                 } else if (reg.status === 'ja_almocou') {
                     statusBadge = '<span class="badge bg-warning text-dark">Já almoçou</span>';
                 } else if (reg.status === 'inativo') {

@@ -5,6 +5,8 @@ Suporte também a pywhatkit como fallback.
 CallMeBot: https://www.callmebot.com/blog/free-api-whatsapp-messages/
 """
 import logging
+import os
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -37,36 +39,33 @@ def enviar_whatsapp_callmebot(phone, apikey, mensagem):
     Returns:
         bool: True se enviado com sucesso, False se erro.
     """
-    try:
-        # Codificar mensagem para URL
-        mensagem_encoded = urllib.parse.quote(mensagem)
-        
-        # Montar URL da API CallMeBot
-        url = (
-            f"https://api.callmebot.com/whatsapp.php"
-            f"?phone={phone}"
-            f"&text={mensagem_encoded}"
-            f"&apikey={apikey}"
-        )
-        
-        # Fazer requisição
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=30) as response:
-            resultado = response.read().decode('utf-8')
-            
-        if 'Message queued' in resultado or '200' in resultado:
-            logger.info(f'Mensagem WhatsApp enviada com sucesso para {phone}')
-            return True
-        else:
-            logger.warning(f'Resposta inesperada do CallMeBot: {resultado}')
-            return False
-            
-    except urllib.error.URLError as e:
-        logger.error(f'Erro de rede ao enviar WhatsApp: {e}')
-        return False
-    except Exception as e:
-        logger.error(f'Erro ao enviar WhatsApp via CallMeBot: {e}')
-        return False
+    for tentativa in range(1, 4):
+        try:
+            mensagem_encoded = urllib.parse.quote(mensagem)
+            url = (
+                f"https://api.callmebot.com/whatsapp.php"
+                f"?phone={phone}"
+                f"&text={mensagem_encoded}"
+                f"&apikey={apikey}"
+            )
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                resultado = response.read().decode('utf-8')
+
+            if 'Message queued' in resultado or '200' in resultado:
+                logger.info(f'Mensagem WhatsApp enviada com sucesso para {phone}')
+                return True
+
+            logger.warning(f'Resposta inesperada do CallMeBot na tentativa {tentativa}: {resultado}')
+        except urllib.error.URLError as e:
+            logger.error(f'Erro de rede ao enviar WhatsApp na tentativa {tentativa}: {e}')
+        except Exception as e:
+            logger.error(f'Erro ao enviar WhatsApp via CallMeBot na tentativa {tentativa}: {e}')
+
+        if tentativa < 3:
+            time.sleep(2 ** (tentativa - 1))
+
+    return False
 
 
 def enviar_whatsapp_pywhatkit(destinatario, mensagem):
@@ -107,10 +106,15 @@ def enviar_whatsapp(destinatario, mensagem):
     """
     whatsapp_config = _get_config()
     
-    habilitado = whatsapp_config.get('habilitado', False)
-    metodo = whatsapp_config.get('metodo', 'callmebot')
-    phone = whatsapp_config.get('numero_telefone', '')
-    apikey = whatsapp_config.get('callmebot_apikey', '')
+    env_enabled = os.environ.get('WHATSAPP_ENABLED')
+    habilitado = (
+        env_enabled.strip().lower() in {'1', 'true', 'yes', 'on', 'sim'}
+        if env_enabled is not None
+        else whatsapp_config.get('habilitado', False)
+    )
+    metodo = os.environ.get('WHATSAPP_METHOD', '').strip() or whatsapp_config.get('metodo', 'callmebot')
+    phone = os.environ.get('WHATSAPP_PHONE_NUMBER', '').strip() or whatsapp_config.get('numero_telefone', '')
+    apikey = os.environ.get('CALLMEBOT_API_KEY', '').strip()
     
     if not habilitado:
         logger.info('WhatsApp desabilitado. Mensagem simulada:')

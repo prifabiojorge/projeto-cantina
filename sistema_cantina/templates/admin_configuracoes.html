@@ -16,6 +16,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('admin_configuracoes') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     {% for cfg in configuracoes %}
                     <div class="mb-3">
                         <label for="{{ cfg.chave }}" class="form-label">

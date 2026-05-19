@@ -202,7 +202,9 @@
                             <th>Nome</th>
                             <th>Turma</th>
                             <th>Turno</th>
+                            <th>Hora</th>
                             <th>Motivo</th>
+                            <th>Responsável</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -212,20 +214,19 @@
                             <td>{{ item.nome }}</td>
                             <td>{{ item.turma }}</td>
                             <td>{{ item.turno }}</td>
+                            <td>{{ item.hora_liberacao }}</td>
                             <td>{{ item.motivo }}</td>
+                            <td>{{ item.usuario_responsavel or '-' }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">
+                            <td colspan="7" class="text-center text-muted">
                                 Nenhuma liberação forçada para esta data.
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
-            <div class="alert alert-info mt-3">
-                <i class="bi bi-info-circle"></i> Funcionalidade de liberações forçadas será implementada em breve.
             </div>
         </div>
     </div>

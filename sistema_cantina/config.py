@@ -3,12 +3,15 @@ from pathlib import Path
 import settings
 
 BASE_DIR = Path(__file__).parent
+IS_VERCEL = bool(os.environ.get('VERCEL'))
+RUNTIME_DIR = Path(os.environ.get('CANTINA_RUNTIME_DIR', '/tmp' if IS_VERCEL else BASE_DIR))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-DATABASE_PATH = BASE_DIR / 'cantina.db'
+DATABASE_PATH = Path(os.environ.get('DATABASE_PATH', str(RUNTIME_DIR / 'cantina.db')))
 
-QRCODE_DIR = BASE_DIR / 'qrcodes_alunos'
+QRCODE_DIR = Path(os.environ.get('QRCODE_DIR', str(RUNTIME_DIR / 'qrcodes_alunos')))
 QRCODE_DIR.mkdir(exist_ok=True)
 
 # Configurações da escola (carregadas do JSON via settings.py)

@@ -1,5 +1,5 @@
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, Response, session
 from pathlib import Path
 import os
 import atexit
@@ -13,6 +13,10 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch, cm
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+try:
+    from flask_wtf import CSRFProtect
+except ImportError:
+    CSRFProtect = None
 import settings
 from config import (
     SECRET_KEY, TURMAS, TURNOS, WHATSAPP_SEND_HOUR, WHATSAPP_SEND_MINUTE,
@@ -24,6 +28,7 @@ from models import (
     editar_aluno, desativar_aluno, reativar_aluno, 
     registrar_checkin_portaria, contar_checkins_portaria_hoje,
     registrar_checkin_cantina, contar_checkins_cantina_hoje, verificar_estado_aluno_para_almoco,
+    registrar_liberacao_forcada,
     gerar_relatorio_portaria_hoje, relatorio_ja_enviado_hoje,
     registrar_relatorio_enviado, enviar_relatorio_whatsapp_agora,
       estatisticas_gerais, historico_checkins, relatorio_detalhado,
@@ -34,22 +39,33 @@ from models import (
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+IS_VERCEL = bool(os.environ.get('VERCEL'))
+DISABLE_APSCHEDULER = os.environ.get('CANTINA_DISABLE_SCHEDULER', '').lower() in {'1', 'true', 'yes', 'on'}
+
+logging_handlers = [logging.StreamHandler()]
+if not IS_VERCEL:
+    log_path = os.environ.get('CANTINA_LOG_FILE', 'flask.log')
+    logging_handlers.insert(0, logging.FileHandler(log_path, encoding='utf-8'))
 
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('flask.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
+    handlers=logging_handlers
 )
 logger = logging.getLogger(__name__)
+csrf = CSRFProtect(app) if CSRFProtect else None
+
+
+if csrf is None:
+    @app.context_processor
+    def csrf_token_fallback():
+        return {'csrf_token': lambda: ''}
 
 init_db()
 
 # Agendador de relatório automático
-if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+if not IS_VERCEL and not DISABLE_APSCHEDULER and (os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug):
     scheduler = BackgroundScheduler()
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())
@@ -480,6 +496,61 @@ def cadastro_aluno():
     
     return render_template('cadastro.html', turmas=TURMAS, turnos=TURNOS)
 
+@app.route('/alunos/importar', methods=['GET', 'POST'])
+def importar_alunos_view():
+    resultado = None
+    if request.method == 'POST':
+        arquivo = request.files.get('arquivo_csv')
+        if not arquivo or not arquivo.filename:
+            flash('Selecione um arquivo CSV para importar.', 'warning')
+            return redirect(url_for('importar_alunos_view'))
+
+        try:
+            conteudo = arquivo.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            flash('Arquivo inválido. Salve o CSV em UTF-8.', 'danger')
+            return redirect(url_for('importar_alunos_view'))
+
+        reader = csv.DictReader(io.StringIO(conteudo))
+        fieldnames = reader.fieldnames or []
+        if 'nome' not in fieldnames or 'matricula' not in fieldnames:
+            flash("CSV deve conter ao menos as colunas 'nome' e 'matricula'.", 'danger')
+            return redirect(url_for('importar_alunos_view'))
+
+        sucessos = 0
+        falhas = 0
+        erros = []
+        for linha, row in enumerate(reader, start=2):
+            nome = (row.get('nome') or '').strip()
+            matricula = (row.get('matricula') or '').strip()
+            turma = (row.get('turma') or '').strip() or (TURMAS[0] if TURMAS else '')
+            turno = (row.get('turno') or '').strip() or (TURNOS[0] if TURNOS else '')
+
+            if not nome or not matricula:
+                falhas += 1
+                erros.append(f'Linha {linha}: nome e matrícula são obrigatórios.')
+                continue
+
+            try:
+                cadastrar_aluno(nome, matricula, turma, turno)
+                sucessos += 1
+            except Exception as exc:
+                falhas += 1
+                erros.append(f'Linha {linha}: {nome} ({matricula}) - {exc}')
+
+        resultado = {
+            'sucessos': sucessos,
+            'falhas': falhas,
+            'erros': erros[:50],
+            'total_erros': len(erros),
+        }
+        flash(
+            f'Importação concluída: {sucessos} aluno(s) importado(s), {falhas} falha(s).',
+            'success' if sucessos else 'warning'
+        )
+
+    return render_template('importar_alunos.html', resultado=resultado)
+
 @app.route('/alunos/qrcode/<matricula>')
 def download_qrcode(matricula):
     from config import QRCODE_DIR
@@ -571,6 +642,22 @@ def api_checkin_cantina():
     resultado = registrar_checkin_cantina(data['qrcode_hash'])
     return jsonify(resultado)
 
+@app.route('/api/cantina/liberacao-forcada', methods=['POST'])
+def api_cantina_liberacao_forcada():
+    data = request.get_json() or {}
+    qrcode_hash = data.get('qrcode_hash')
+    motivo = data.get('motivo')
+    usuario_sessao = session.get('v2_user') or {}
+    responsavel = data.get('responsavel') or usuario_sessao.get('email') or 'cantina'
+    if not qrcode_hash:
+        return jsonify({'error': 'Dados inválidos'}), 400
+
+    resultado = registrar_liberacao_forcada(qrcode_hash, motivo, responsavel)
+    status_code = 200 if resultado.get('status') == 'liberado_forcado' else 400
+    if resultado.get('status') in {'ja_almocou', 'ja_liberado'}:
+        status_code = 409
+    return jsonify(resultado), status_code
+
 @app.route('/api/cantina/contagem-hoje')
 def api_cantina_contagem_hoje():
     total = contar_checkins_cantina_hoje()
@@ -640,8 +727,8 @@ def api_whatsapp_teste():
         with open(config_path, 'r', encoding='utf-8') as f:
             cfg = _json.load(f)
         wa = cfg.get('whatsapp', {})
-        phone = wa.get('numero_telefone', '')
-        apikey = wa.get('callmebot_apikey', '')
+        phone = os.environ.get('WHATSAPP_PHONE_NUMBER', '').strip() or wa.get('numero_telefone', '')
+        apikey = os.environ.get('CALLMEBOT_API_KEY', '').strip()
         if not phone or not apikey:
             return jsonify({'sucesso': False, 'mensagem': 'Phone ou API key não configurados.'}), 400
         msg = f"🧪 Teste do Sistema Cantina - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
@@ -655,7 +742,7 @@ def api_whatsapp_teste():
 def admin_configuracoes():
     """Página de administração de configurações do sistema (JSON-based)."""
     # Sincronizar do banco para JSON na primeira execução
-    if not settings.CONFIG_JSON_PATH.exists():
+    if not settings.IS_VERCEL and not settings.CONFIG_JSON_PATH.exists():
         settings.migrate_from_database()
     
     if request.method == 'POST':
@@ -711,6 +798,20 @@ def configuracoes():
     """Alias para a página de configurações."""
     return redirect(url_for('admin_configuracoes'))
 
+@app.route('/configuracoes/exportar')
+def exportar_configuracoes():
+    """Exporta configurações não sensíveis em JSON."""
+    import json
+    config_data = settings.load_settings()
+    config_data.get('whatsapp', {}).pop('callmebot_apikey', None)
+    output = json.dumps(config_data, ensure_ascii=False, indent=2)
+    filename = f"configuracoes_cantina_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    return Response(
+        output,
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment;filename={filename}'}
+    )
+
 @app.route('/relatorios/<data>/exportar')
 def exportar_relatorio_diario(data):
     """Exporta relatório de um dia específico como CSV ou PDF."""
@@ -723,6 +824,8 @@ def exportar_relatorio_diario(data):
     
     # Obter relatório para a data (usando relatório detalhado por turma/turno)
     relatorio = relatorio_detalhado(data, data, None, None)
+    relatorio_dia = relatorio_detalhado_data(data)
+    liberacoes_forcadas = relatorio_dia.get('tabelas', {}).get('liberacoes_forcadas', [])
     
     # FIX: garantir que as chaves 'detalhes' e 'totais' existem no relatório
     if 'detalhes' not in relatorio:
@@ -760,6 +863,21 @@ def exportar_relatorio_diario(data):
         writer.writerow(['Alunos únicos portaria:', relatorio['totais']['alunos_unicos_portaria']])
         writer.writerow(['Alunos únicos cantina:', relatorio['totais']['alunos_unicos_cantina']])
         writer.writerow(['Alunos sem almoço:', relatorio['totais']['alunos_sem_almoco']])
+        writer.writerow(['Liberações forçadas:', len(liberacoes_forcadas)])
+        if liberacoes_forcadas:
+            writer.writerow([])
+            writer.writerow(['LIBERAÇÕES FORÇADAS'])
+            writer.writerow(['Matrícula', 'Nome', 'Turma', 'Turno', 'Hora', 'Motivo', 'Responsável'])
+            for item in liberacoes_forcadas:
+                writer.writerow([
+                    item.get('matricula'),
+                    item.get('nome'),
+                    item.get('turma'),
+                    item.get('turno'),
+                    item.get('hora_liberacao'),
+                    item.get('motivo'),
+                    item.get('usuario_responsavel') or '-',
+                ])
         
         output.seek(0)
         filename = f"relatorio_cantina_{data}.csv"
@@ -842,6 +960,7 @@ def exportar_relatorio_diario(data):
             ['Alunos únicos na portaria:', str(relatorio['totais']['alunos_unicos_portaria'])],
             ['Alunos únicos na cantina:', str(relatorio['totais']['alunos_unicos_cantina'])],
             ['Alunos que não almoçaram:', str(relatorio['totais']['alunos_sem_almoco'])],
+            ['Liberações forçadas:', str(len(liberacoes_forcadas))],
         ]
         
         totais_table = Table(totais_data, colWidths=[8*cm, 3*cm])
@@ -854,6 +973,30 @@ def exportar_relatorio_diario(data):
             ('BACKGROUND', (0, 0), (-1, -1), colors.lightgrey),
         ]))
         elements.append(totais_table)
+
+        if liberacoes_forcadas:
+            elements.append(Spacer(1, 0.5*cm))
+            liberacoes_title = Paragraph("<b>Liberações Forçadas:</b>", styles['Heading3'])
+            elements.append(liberacoes_title)
+            liberacoes_data = [['Matrícula', 'Nome', 'Hora', 'Motivo', 'Responsável']]
+            for item in liberacoes_forcadas:
+                liberacoes_data.append([
+                    item.get('matricula', ''),
+                    item.get('nome', ''),
+                    item.get('hora_liberacao', ''),
+                    item.get('motivo', ''),
+                    item.get('usuario_responsavel') or '-',
+                ])
+            liberacoes_table = Table(liberacoes_data, colWidths=[2.5*cm, 4*cm, 3*cm, 5*cm, 4*cm])
+            liberacoes_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            elements.append(liberacoes_table)
         
         # Data de geração
         gerado_em = Paragraph(
@@ -907,7 +1050,70 @@ def backup_database():
         mimetype='application/vnd.sqlite3'
     )
 
+
+@app.route('/health')
+def health_check():
+    """Health check simples para Vercel, monitoramento e operação local."""
+    db_ok = False
+    try:
+        conn = get_db()
+        conn.execute('SELECT 1').fetchone()
+        conn.close()
+        db_ok = True
+    except Exception as e:
+        logger.error(f'Health check DB falhou: {e}')
+
+    supabase_env = {
+        'SUPABASE_URL': bool(os.environ.get('SUPABASE_URL')),
+        'SUPABASE_ANON_KEY': bool(os.environ.get('SUPABASE_ANON_KEY')),
+        'SUPABASE_SERVICE_ROLE_KEY': bool(os.environ.get('SUPABASE_SERVICE_ROLE_KEY')),
+        'CRON_SECRET': bool(os.environ.get('CRON_SECRET')),
+    }
+
+    status = 'ok' if db_ok else 'degraded'
+    return jsonify({
+        'status': status,
+        'timestamp': datetime.now().isoformat(timespec='seconds'),
+        'database': db_ok,
+        'supabase_env': supabase_env,
+        'version': '2.0-cloud-foundation'
+    }), 200 if db_ok else 503
+
+
+@app.route('/api/cron/relatorio-diario')
+def cron_relatorio_diario():
+    """Endpoint chamado pelo Vercel Cron para envio do relatório diário."""
+    cron_secret = os.environ.get('CRON_SECRET', '').strip()
+    if cron_secret:
+        bearer = request.headers.get('Authorization', '')
+        query_secret = request.args.get('secret', '')
+        if bearer != f'Bearer {cron_secret}' and query_secret != cron_secret:
+            return jsonify({'sucesso': False, 'mensagem': 'Cron não autorizado.'}), 401
+
+    sucesso, mensagem = enviar_relatorio_whatsapp_agora()
+    return jsonify({
+        'sucesso': sucesso,
+        'mensagem': mensagem,
+        'timestamp': datetime.now().isoformat(timespec='seconds')
+    }), 200 if sucesso else 202
+
+if csrf is not None:
+    for csrf_exempt_view in (
+        api_checkin_portaria,
+        api_checkin_cantina,
+        api_cantina_liberacao_forcada,
+        api_relatorio_gerar_agora,
+        api_whatsapp_teste,
+        cron_relatorio_diario,
+    ):
+        csrf.exempt(csrf_exempt_view)
+
 # ========== ERROR HANDLERS ==========
+@app.errorhandler(403)
+def forbidden(e):
+    logger.warning(f'403 - {request.path} - {request.remote_addr}')
+    return render_template('403.html'), 403
+
 @app.errorhandler(404)
 def page_not_found(e):
     logger.warning(f'404 - {request.path} - {request.remote_addr}')
@@ -935,12 +1141,13 @@ def after_request(response):
 
 if __name__ == '__main__':
     import os
+    debug_enabled = os.environ.get('FLASK_DEBUG', '').lower() in {'1', 'true', 'yes', 'on'}
     # FIX: HTTPS necessário para câmera funcionar em rede local
     try:
         app.run(
             host='0.0.0.0',
             port=5000,
-            debug=True,
+            debug=debug_enabled,
             ssl_context='adhoc',   # certificado autoassinado
             use_reloader=False     # evita duplicação do scheduler
         )
@@ -950,6 +1157,6 @@ if __name__ == '__main__':
         app.run(
             host='0.0.0.0',
             port=5000,
-            debug=True,
+            debug=debug_enabled,
             use_reloader=False
         )

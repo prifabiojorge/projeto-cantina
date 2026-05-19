@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Acesso negado{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="display-1 text-warning">403</h1>
+            <h2 class="mb-4">Acesso negado</h2>
+            <p class="lead mb-4">
+                Seu perfil não tem permissão para acessar esta área.
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{{ url_for('portaria') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-door-open"></i> Portaria
+                </a>
+                <a href="{{ url_for('cantina') }}" class="btn btn-outline-success">
+                    <i class="bi bi-cup"></i> Cantina
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

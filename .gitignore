@@ -17,6 +17,8 @@ env/
 *.db
 *.db.backup
 *.sqlite3
+backups/
+instance/
 
 # QR codes gerados
 sistema_cantina/qrcodes_alunos/
@@ -36,6 +38,8 @@ qrcodes_teste.pdf
 *.temp
 *.json.tmp
 nul
+repomix-output.xml
+ANALISE_ARQUITETURAL.xml
 
 # IDE
 .vscode/
@@ -52,6 +56,11 @@ Desktop.ini
 # Variáveis de ambiente
 .env
 .env.local
+*.env
+sistema_cantina/config_escola.json
+config_escola.json
+.vercel/
+.supabase/
 
 # Flask
 instance/

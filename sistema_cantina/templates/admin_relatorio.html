@@ -93,6 +93,7 @@
                     <p class="small text-muted mt-2">Aguarde até amanhã para enviar novamente.</p>
                     {% else %}
                     <form method="POST" action="{{ url_for('admin_relatorio_enviar') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-success btn-lg w-100">
                             <i class="bi bi-whatsapp"></i> Enviar Relatório Agora
                         </button>

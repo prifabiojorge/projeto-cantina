@@ -12,10 +12,14 @@ from datetime import datetime
 import sqlite3
 
 BASE_DIR = Path(__file__).parent
-DATABASE_PATH = BASE_DIR / 'cantina.db'
+IS_VERCEL = bool(os.environ.get('VERCEL'))
+RUNTIME_DIR = Path(os.environ.get('CANTINA_RUNTIME_DIR', '/tmp' if IS_VERCEL else BASE_DIR))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+DATABASE_PATH = Path(os.environ.get('DATABASE_PATH', str(RUNTIME_DIR / 'cantina.db')))
 
 # Caminho para o arquivo de configurações JSON
-CONFIG_JSON_PATH = Path(__file__).parent / 'config_escola.json'
+default_config_path = RUNTIME_DIR / 'config_escola.json' if IS_VERCEL else BASE_DIR / 'config_escola.json'
+CONFIG_JSON_PATH = Path(os.environ.get('CONFIG_ESCOLA_PATH', str(default_config_path)))
 
 # Estrutura padrão das configurações
 DEFAULT_CONFIG = {
@@ -42,6 +46,8 @@ DEFAULT_CONFIG = {
 def load_settings():
     """Carrega as configurações do arquivo JSON. Cria o arquivo com padrão se não existir."""
     if not CONFIG_JSON_PATH.exists():
+        if IS_VERCEL:
+            return DEFAULT_CONFIG.copy()
         save_settings(DEFAULT_CONFIG)
         return DEFAULT_CONFIG.copy()
     

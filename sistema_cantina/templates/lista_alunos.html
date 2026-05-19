@@ -3,9 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-people"></i> Alunos Cadastrados</h1>
-    <a href="{{ url_for('cadastro_aluno') }}" class="btn btn-primary">
-        <i class="bi bi-person-plus"></i> Novo Aluno
-    </a>
+    <div class="btn-group">
+        <a href="{{ url_for('importar_alunos_view') }}" class="btn btn-outline-primary">
+            <i class="bi bi-upload"></i> Importar CSV
+        </a>
+        <a href="{{ url_for('cadastro_aluno') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> Novo Aluno
+        </a>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -84,6 +89,7 @@
                                 </a>
                                 {% if aluno.ativo %}
                                 <form method="POST" action="{{ url_for('desativar_aluno_view', id=aluno.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="confirm" value="true">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Desativar" onclick="return confirm('Tem certeza que deseja desativar este aluno?')">
                                         <i class="bi bi-person-dash"></i>
@@ -91,6 +97,7 @@
                                 </form>
                                 {% else %}
                                 <form method="POST" action="{{ url_for('reativar_aluno_view', id=aluno.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="confirm" value="true">
                                     <button type="submit" class="btn btn-sm btn-outline-success" title="Reativar" onclick="return confirm('Reativar este aluno?')">
                                         <i class="bi bi-person-check"></i>

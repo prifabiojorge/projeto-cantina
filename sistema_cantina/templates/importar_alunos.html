@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-upload"></i> Importar Alunos</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('importar_alunos_view') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="arquivo_csv" class="form-label">Arquivo CSV</label>
+                        <input type="file" class="form-control" id="arquivo_csv" name="arquivo_csv" accept=".csv,text/csv" required>
+                        <div class="form-text">Colunas aceitas: <code>nome</code>, <code>matricula</code>, <code>turma</code>, <code>turno</code>.</div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('listar_alunos_view') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Importar CSV
+                        </button>
+                    </div>
+                </form>
+
+                {% if resultado %}
+                <hr>
+                <div class="row text-center">
+                    <div class="col-md-6">
+                        <div class="display-6 text-success">{{ resultado.sucessos }}</div>
+                        <div class="text-muted">Importados</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="display-6 text-danger">{{ resultado.falhas }}</div>
+                        <div class="text-muted">Falhas</div>
+                    </div>
+                </div>
+
+                {% if resultado.erros %}
+                <div class="alert alert-warning mt-4">
+                    <strong>Erros encontrados</strong>
+                    <ul class="mb-0 mt-2">
+                        {% for erro in resultado.erros %}
+                        <li>{{ erro }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if resultado.total_erros > resultado.erros|length %}
+                    <p class="mb-0 mt-2">Mais erros omitidos nesta visualização.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

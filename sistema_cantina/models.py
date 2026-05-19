@@ -2,6 +2,7 @@ import qrcode
 import sqlite3
 import uuid
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
 from database import get_db
@@ -254,6 +255,62 @@ def registrar_checkin_cantina(qrcode_hash, data_iso=None, hora_almoco=None):
     conn.close()
     return {'status': status, 'aluno': aluno}
 
+
+def registrar_liberacao_forcada(qrcode_hash, motivo, usuario_responsavel=None, data_iso=None):
+    from datetime import datetime, date
+
+    motivo = (motivo or '').strip()
+    usuario_responsavel = (usuario_responsavel or 'cantina').strip() or 'cantina'
+    if len(motivo) < 3:
+        return {'status': 'motivo_invalido', 'aluno': None, 'mensagem': 'Informe um motivo com pelo menos 3 caracteres.'}
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM alunos WHERE qrcode_hash = ?', (qrcode_hash,))
+    row = cursor.fetchone()
+    if row is None:
+        conn.close()
+        return {'status': 'nao_encontrado', 'aluno': None}
+
+    aluno = dict(row)
+    if not aluno['ativo']:
+        conn.close()
+        return {'status': 'inativo', 'aluno': aluno}
+
+    if data_iso is None:
+        data_iso = date.today().isoformat()
+
+    cursor.execute('SELECT id FROM checkin_cantina WHERE aluno_id = ? AND data = ?', (aluno['id'], data_iso))
+    if cursor.fetchone() is not None:
+        conn.close()
+        return {'status': 'ja_almocou', 'aluno': aluno}
+
+    agora = datetime.now().replace(microsecond=0).isoformat(sep=' ')
+    try:
+        cursor.execute('''
+            INSERT INTO checkin_cantina (aluno_id, data, hora_almoco)
+            VALUES (?, ?, ?)
+        ''', (aluno['id'], data_iso, agora))
+        cursor.execute('''
+            INSERT INTO liberacoes_forcadas (aluno_id, data, hora_liberacao, motivo, usuario_responsavel)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (aluno['id'], data_iso, agora, motivo, usuario_responsavel))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        conn.close()
+        return {'status': 'ja_liberado', 'aluno': aluno}
+
+    conn.close()
+    return {
+        'status': 'liberado_forcado',
+        'aluno': aluno,
+        'motivo': motivo,
+        'usuario_responsavel': usuario_responsavel,
+    }
+
+
 def contar_checkins_cantina_hoje():
     from datetime import date
     conn = get_db()
@@ -407,12 +464,12 @@ def relatorio_ja_enviado_hoje():
     conn = get_db()
     cursor = conn.cursor()
     hoje = date.today().isoformat()
-    cursor.execute('SELECT id FROM relatorios_enviados WHERE data = ?', (hoje,))
+    cursor.execute("SELECT id FROM relatorios_enviados WHERE data = ? AND status = 'enviado'", (hoje,))
     row = cursor.fetchone()
     conn.close()
     return row is not None
 
-def registrar_relatorio_enviado(total_esperado):
+def registrar_relatorio_enviado(total_esperado, status='enviado', mensagem=None):
     """
     Registra no banco que o relatório foi enviado hoje.
     """
@@ -423,9 +480,14 @@ def registrar_relatorio_enviado(total_esperado):
     agora = datetime.now().isoformat(' ', 'seconds')
     try:
         cursor.execute('''
-            INSERT INTO relatorios_enviados (data, total_esperado, enviado_em)
-            VALUES (?, ?, ?)
-        ''', (hoje, total_esperado, agora))
+            INSERT INTO relatorios_enviados (data, total_esperado, enviado_em, status, mensagem)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(data) DO UPDATE SET
+                total_esperado = excluded.total_esperado,
+                enviado_em = excluded.enviado_em,
+                status = excluded.status,
+                mensagem = excluded.mensagem
+        ''', (hoje, total_esperado, agora, status, mensagem))
         conn.commit()
         success = True
     except sqlite3.IntegrityError:
@@ -461,7 +523,9 @@ Previsão de almoços: {total} alunos
     
     # Salva em arquivo (sempre, como fallback)
     try:
-        with open('relatorios_log.txt', 'a', encoding='utf-8') as f:
+        runtime_dir = Path(os.environ.get('CANTINA_RUNTIME_DIR', '/tmp' if os.environ.get('VERCEL') else '.'))
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        with open(runtime_dir / 'relatorios_log.txt', 'a', encoding='utf-8') as f:
             f.write(f"\n{'='*50}\n")
             f.write(f"Data: {hoje}\n")
             f.write(f"Total: {total} alunos\n")
@@ -480,9 +544,9 @@ Previsão de almoços: {total} alunos
         registrar_relatorio_enviado(total)
         return True, f'Relatório enviado com sucesso. Total: {total} alunos.'
     else:
-        # Mesmo com falha no WhatsApp, registra que o relatório foi gerado
-        registrar_relatorio_enviado(total)
-        return False, 'Relatório gerado e salvo em log, mas falha ao enviar via WhatsApp.'
+        mensagem_falha = 'Relatório gerado e salvo em log, mas falha ao enviar via WhatsApp.'
+        registrar_relatorio_enviado(total, status='falha', mensagem=mensagem_falha)
+        return False, mensagem_falha
 
 # ============================================================================
 # Funções para Dashboard Administrativo (Prompt 5)
@@ -785,9 +849,24 @@ def relatorio_detalhado_data(data):
     rows = cursor.fetchall()
     desistencias = [dict(row) for row in rows]
     
-    # 4. Liberações forçadas (não implementado ainda - placeholder)
-    # Por enquanto, lista vazia
-    liberacoes_forcadas = []
+    # 4. Liberações forçadas
+    cursor.execute('''
+        SELECT
+            a.id,
+            a.matricula,
+            a.nome,
+            a.turma,
+            a.turno,
+            lf.hora_liberacao,
+            lf.motivo,
+            lf.usuario_responsavel
+        FROM liberacoes_forcadas lf
+        JOIN alunos a ON lf.aluno_id = a.id
+        WHERE lf.data = ?
+        ORDER BY lf.hora_liberacao
+    ''', (data,))
+    rows = cursor.fetchall()
+    liberacoes_forcadas = [dict(row) for row in rows]
     
     # Totais resumidos
     total_portaria = len(checkins_portaria)
