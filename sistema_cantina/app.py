@@ -336,6 +336,7 @@ def exportar_relatorio_pdf():
 @app.route('/alunos/qrcodes/pdf')
 def imprimir_qrcodes_alunos():
     """Gera PDF com todos os QR codes dos alunos ativos para impressão em lote."""
+    from xml.sax.saxutils import escape
     # Obter alunos ativos
     alunos = listar_alunos(ativo=True)
     
@@ -395,9 +396,9 @@ def imprimir_qrcodes_alunos():
                         # Criar célula com imagem e texto
                         cell_content = [
                             Image(qr_path, width=qr_size, height=qr_size),
-                            Paragraph(f"<b>{aluno['nome']}</b>", styles['Normal']),
-                            Paragraph(f"Matrícula: {aluno['matricula']}", styles['Small']),
-                            Paragraph(f"Turma: {aluno['turma']}", styles['Normal'])
+                            Paragraph(f"<b>{escape(aluno['nome'])}</b>", styles['Normal']),
+                            Paragraph(f"Matrícula: {escape(aluno['matricula'])}", styles['Normal']),
+                            Paragraph(f"Turma: {escape(aluno['turma'])}", styles['Normal'])
                         ]
                         # Usar uma tabela interna para centralizar conteúdo
                         from reportlab.platypus.flowables import KeepTogether
