@@ -17,7 +17,8 @@ with patch.object(_legacy, 'listar_alunos', return_value=alunos) as listar:
     http = app.test_client()
     pagina = http.get('/alunos')
     assert pagina.status_code == 200
-    assert b'QR Codes em PDF' in pagina.data
+    assert b'Imprimir QR Codes' in pagina.data
+    assert b'href="/alunos/imprimir-qrcodes"' in pagina.data
     resposta = http.get('/alunos/qrcodes/pdf')
     assert resposta.status_code == 200, resposta.status_code
     assert resposta.mimetype == 'application/pdf'
