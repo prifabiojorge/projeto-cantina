@@ -12,6 +12,8 @@ build/
 venv/
 env/
 .venv/
+.runtime-deps/
+Lista Unificada de Alunos - CISEB 2026 v2.md
 
 # Banco de dados SQLite
 *.db

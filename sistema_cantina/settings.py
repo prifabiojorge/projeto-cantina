@@ -24,9 +24,9 @@ CONFIG_JSON_PATH = Path(os.environ.get('CONFIG_ESCOLA_PATH', str(default_config_
 # Estrutura padrão das configurações
 DEFAULT_CONFIG = {
     "escola": {
-        "nome": "Escola Municipal",
-        "turmas": ["1ºA", "1ºB", "2ºA", "2ºB", "3ºA", "3ºB"],
-        "turnos": ["Manhã", "Tarde", "Integral"]
+        "nome": "Escola Estadual Celso Rodrigues",
+        "turmas": ["101", "102", "103", "104", "201", "202", "203", "204", "301", "302"],
+        "turnos": ["Integral"]
     },
     "whatsapp": {
         "habilitado": False,
@@ -45,6 +45,10 @@ DEFAULT_CONFIG = {
 
 def load_settings():
     """Carrega as configurações do arquivo JSON. Cria o arquivo com padrão se não existir."""
+    if IS_VERCEL or os.environ.get('CANTINA_DATA_BACKEND') == 'supabase':
+        from cloud_models import get_config
+        import copy
+        return json.loads(get_config('escola_config_json', json.dumps(copy.deepcopy(DEFAULT_CONFIG))))
     if not CONFIG_JSON_PATH.exists():
         if IS_VERCEL:
             return DEFAULT_CONFIG.copy()
@@ -72,6 +76,13 @@ def load_settings():
 
 def save_settings(settings):
     """Salva as configurações no arquivo JSON."""
+    if IS_VERCEL or os.environ.get('CANTINA_DATA_BACKEND') == 'supabase':
+        from cloud_models import set_config
+        settings['escola']['turnos'] = ['Integral']
+        set_config('escola_config_json', json.dumps(settings, ensure_ascii=False))
+        for chave in ('alarme_som', 'alarme_visual', 'dias_historico'):
+            set_config(chave, str(settings['sistema'][chave]).lower())
+        return True
     try:
         with open(CONFIG_JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(settings, f, ensure_ascii=False, indent=2)

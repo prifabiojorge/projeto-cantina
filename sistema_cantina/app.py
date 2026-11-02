@@ -24,7 +24,7 @@ from config import (
 )
 from database import init_db, get_db
 from models import (
-    cadastrar_aluno, listar_alunos, buscar_aluno_por_matricula, 
+    cadastrar_aluno, listar_alunos, buscar_aluno_por_matricula, buscar_aluno_por_id,
     editar_aluno, desativar_aluno, reativar_aluno, 
     registrar_checkin_portaria, contar_checkins_portaria_hoje,
     registrar_checkin_cantina, contar_checkins_cantina_hoje, verificar_estado_aluno_para_almoco,
@@ -54,6 +54,7 @@ logging.basicConfig(
     handlers=logging_handlers
 )
 logger = logging.getLogger(__name__)
+logging.getLogger('httpx').setLevel(logging.WARNING)
 csrf = CSRFProtect(app) if CSRFProtect else None
 
 
@@ -62,7 +63,9 @@ if csrf is None:
     def csrf_token_fallback():
         return {'csrf_token': lambda: ''}
 
-init_db()
+CLOUD_DATA = IS_VERCEL or os.environ.get('CANTINA_DATA_BACKEND') == 'supabase'
+if not CLOUD_DATA:
+    init_db()
 
 # Agendador de relatório automático
 if not IS_VERCEL and not DISABLE_APSCHEDULER and (os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug):
@@ -384,16 +387,17 @@ def imprimir_qrcodes_alunos():
                 if idx < len(grupo):
                     aluno = grupo[idx]
                     # Caminho do QR code
-                    qr_path = Path(QRCODE_DIR) / f"{aluno['matricula']}.png"
+                    from app.services.qrcode_service import make_qrcode_png_bytes
+                    qr_path = io.BytesIO(make_qrcode_png_bytes(aluno['qrcode_hash']))
                     
                     # Verificar se arquivo existe
-                    if qr_path.exists():
+                    if qr_path:
                         # Criar célula com imagem e texto
                         cell_content = [
-                            Image(str(qr_path), width=qr_size, height=qr_size),
+                            Image(qr_path, width=qr_size, height=qr_size),
                             Paragraph(f"<b>{aluno['nome']}</b>", styles['Normal']),
                             Paragraph(f"Matrícula: {aluno['matricula']}", styles['Small']),
-                            Paragraph(f"Turma: {aluno['turma']} - Turno: {aluno['turno']}", styles['Small'])
+                            Paragraph(f"Turma: {aluno['turma']}", styles['Normal'])
                         ]
                         # Usar uma tabela interna para centralizar conteúdo
                         from reportlab.platypus.flowables import KeepTogether
@@ -476,7 +480,7 @@ def cadastro_aluno():
         nome = request.form['nome'].strip()
         matricula = request.form['matricula'].strip()
         turma = request.form['turma']
-        turno = request.form['turno']
+        turno = 'Integral'
         
         if not nome or not matricula:
             flash('Nome e matrícula são obrigatórios.', 'danger')
@@ -524,7 +528,7 @@ def importar_alunos_view():
             nome = (row.get('nome') or '').strip()
             matricula = (row.get('matricula') or '').strip()
             turma = (row.get('turma') or '').strip() or (TURMAS[0] if TURMAS else '')
-            turno = (row.get('turno') or '').strip() or (TURNOS[0] if TURNOS else '')
+            turno = 'Integral'
 
             if not nome or not matricula:
                 falhas += 1
@@ -553,6 +557,13 @@ def importar_alunos_view():
 
 @app.route('/alunos/qrcode/<matricula>')
 def download_qrcode(matricula):
+    import qrcode
+    aluno = buscar_aluno_por_matricula(matricula)
+    if aluno:
+        buffer = io.BytesIO()
+        qrcode.make(aluno['qrcode_hash']).save(buffer, format='PNG')
+        buffer.seek(0)
+        return send_file(buffer, mimetype='image/png', as_attachment=True, download_name=f'QRCode_{matricula}.png')
     from config import QRCODE_DIR
     filename = QRCODE_DIR / f'{matricula}.png'
     if not filename.exists():
@@ -560,13 +571,9 @@ def download_qrcode(matricula):
         return redirect(url_for('listar_alunos_view'))
     return send_file(filename, as_attachment=True, download_name=f'QRCode_{matricula}.png')
 
-@app.route('/alunos/editar/<int:id>', methods=['GET', 'POST'])
+@app.route('/alunos/editar/<id>', methods=['GET', 'POST'])
 def editar_aluno_view(id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM alunos WHERE id = ?', (id,))
-    aluno = cursor.fetchone()
-    conn.close()
+    aluno = buscar_aluno_por_id(id)
     
     if aluno is None:
         flash('Aluno não encontrado.', 'danger')
@@ -577,7 +584,7 @@ def editar_aluno_view(id):
     if request.method == 'POST':
         nome = request.form['nome'].strip()
         turma = request.form['turma']
-        turno = request.form['turno']
+        turno = 'Integral'
         
         if not nome:
             flash('Nome é obrigatório.', 'danger')
@@ -593,14 +600,14 @@ def editar_aluno_view(id):
     
     return render_template('editar_aluno.html', aluno=aluno, turmas=TURMAS, turnos=TURNOS)
 
-@app.route('/alunos/desativar/<int:id>', methods=['POST'])
+@app.route('/alunos/desativar/<id>', methods=['POST'])
 def desativar_aluno_view(id):
     if request.form.get('confirm') == 'true':
         desativar_aluno(id)
         flash('Aluno desativado com sucesso.', 'success')
     return redirect(url_for('listar_alunos_view'))
 
-@app.route('/alunos/reativar/<int:id>', methods=['POST'])
+@app.route('/alunos/reativar/<id>', methods=['POST'])
 def reativar_aluno_view(id):
     if request.form.get('confirm') == 'true':
         reativar_aluno(id)
@@ -1036,6 +1043,12 @@ def imprimir_qrcodes_html():
 
 @app.route('/backup')
 def backup_database():
+    if CLOUD_DATA:
+        import json
+        from cloud_models import rows
+        tabelas = ('alunos', 'checkin_portaria', 'checkin_cantina', 'liberacoes_forcadas', 'relatorios_enviados', 'configuracoes')
+        return Response(json.dumps({t: rows(t) for t in tabelas}, ensure_ascii=False),
+                        mimetype='application/json', headers={'Content-Disposition': 'attachment;filename=cantina_backup.json'})
     """Faz download do banco de dados SQLite."""
     from config import DATABASE_PATH
     
@@ -1056,9 +1069,13 @@ def health_check():
     """Health check simples para Vercel, monitoramento e operação local."""
     db_ok = False
     try:
-        conn = get_db()
-        conn.execute('SELECT 1').fetchone()
-        conn.close()
+        if CLOUD_DATA:
+            from cloud_models import client
+            client().table('alunos').select('id').limit(1).execute()
+        else:
+            conn = get_db()
+            conn.execute('SELECT 1').fetchone()
+            conn.close()
         db_ok = True
     except Exception as e:
         logger.error(f'Health check DB falhou: {e}')
@@ -1075,6 +1092,7 @@ def health_check():
         'status': status,
         'timestamp': datetime.now().isoformat(timespec='seconds'),
         'database': db_ok,
+        'backend': 'supabase' if CLOUD_DATA else 'sqlite',
         'supabase_env': supabase_env,
         'version': '2.0-cloud-foundation'
     }), 200 if db_ok else 503
@@ -1084,6 +1102,8 @@ def health_check():
 def cron_relatorio_diario():
     """Endpoint chamado pelo Vercel Cron para envio do relatório diário."""
     cron_secret = os.environ.get('CRON_SECRET', '').strip()
+    if not cron_secret:
+        return jsonify({'sucesso': False, 'mensagem': 'Cron nao configurado.'}), 503
     if cron_secret:
         bearer = request.headers.get('Authorization', '')
         query_secret = request.args.get('secret', '')
@@ -1126,6 +1146,9 @@ def internal_server_error(e):
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
     logger.exception(f'Exceção não tratada: {e}')
     return render_template('500.html'), 500
 

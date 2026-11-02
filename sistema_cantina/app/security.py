@@ -85,6 +85,20 @@ def require_admin(fn: Callable):
 def install_security_hooks(app):
     @app.before_request
     def v2_require_auth_for_admin_routes():
+        if V2_AUTH_REQUIRED:
+            papel = None
+            if _matches(request.path, ('/portaria', '/api/checkin-portaria', '/api/portaria')):
+                papel = 'portaria'
+            elif _matches(request.path, ('/cantina', '/api/checkin-cantina', '/api/cantina')):
+                papel = 'cantina'
+            if papel:
+                if not is_authenticated():
+                    if request.path.startswith('/api/'):
+                        abort(401)
+                    return redirect(url_for('v2_auth.login', next=request.path))
+                if current_role() not in ('admin', papel):
+                    abort(403)
+                return None
         if not requires_admin_auth(request.path):
             return None
         if not is_authenticated():
@@ -122,19 +136,19 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
     try:
         perfil_response = (
             client.table("perfis_usuarios")
-            .select("papel,nome")
+            .select("papel,nome,ativo")
             .eq("user_id", user_id)
             .limit(1)
             .execute()
         )
         perfis = getattr(perfil_response, "data", None) or []
-        if perfis:
+        if perfis and perfis[0].get('ativo'):
             papel = perfis[0].get("papel") or ""
             nome = perfis[0].get("nome") or ""
     except Exception:
         papel = ""
 
-    if papel != "admin":
+    if papel not in ('admin', 'portaria', 'cantina'):
         return False, "Usuário autenticado, mas sem perfil administrativo."
 
     session["v2_access_token"] = access_token

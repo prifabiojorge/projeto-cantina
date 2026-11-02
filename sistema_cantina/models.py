@@ -11,6 +11,14 @@ from settings import TURMAS, TURNOS
 
 logger = logging.getLogger(__name__)
 
+def buscar_aluno_por_id(id):
+    conn = get_db()
+    try:
+        row = conn.execute('SELECT * FROM alunos WHERE id = ?', (id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
 def cadastrar_aluno(nome, matricula, turma, turno):
     if turma not in TURMAS:
         raise ValueError(f'Turma inválida. Opções: {", ".join(TURMAS)}')
@@ -1080,3 +1088,19 @@ def get_all_config():
         }
         for row in rows
     ]
+
+
+# Keep local SQLite available; production never falls back on cloud failures.
+if os.environ.get('VERCEL') or os.environ.get('CANTINA_DATA_BACKEND') == 'supabase':
+    import cloud_models
+    for _name in (
+        'buscar_aluno_por_id', 'cadastrar_aluno', 'listar_alunos', 'buscar_aluno_por_qrcode',
+        'buscar_aluno_por_matricula', 'editar_aluno', 'desativar_aluno', 'reativar_aluno',
+        'registrar_checkin_portaria', 'registrar_checkin_cantina', 'registrar_liberacao_forcada',
+        'verificar_estado_aluno_para_almoco', 'contar_checkins_portaria_hoje', 'contar_checkins_cantina_hoje',
+        'estatisticas_almoco_hoje', 'estatisticas_gerais', 'historico_checkins', 'relatorio_detalhado',
+        'relatorio_detalhado_data', 'historico_almoco_semanal', 'almocos_por_turma_hoje', 'ultimas_atividades',
+        'gerar_relatorio_portaria_hoje', 'relatorio_ja_enviado_hoje', 'registrar_relatorio_enviado',
+        'get_config', 'set_config', 'get_all_config',
+    ):
+        globals()[_name] = getattr(cloud_models, _name)
