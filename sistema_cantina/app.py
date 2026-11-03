@@ -728,20 +728,11 @@ def api_relatorio_gerar_agora():
 @app.route('/api/whatsapp/teste', methods=['POST'])
 def api_whatsapp_teste():
     """Envia mensagem de teste via WhatsApp (CallMeBot)."""
-    from whatsapp_sender import enviar_whatsapp_callmebot
-    import json as _json
+    from whatsapp_sender import enviar_whatsapp
     try:
-        config_path = Path(__file__).parent / 'config_escola.json'
-        with open(config_path, 'r', encoding='utf-8') as f:
-            cfg = _json.load(f)
-        wa = cfg.get('whatsapp', {})
-        phone = os.environ.get('WHATSAPP_PHONE_NUMBER', '').strip() or wa.get('numero_telefone', '')
-        apikey = os.environ.get('CALLMEBOT_API_KEY', '').strip()
-        if not phone or not apikey:
-            return jsonify({'sucesso': False, 'mensagem': 'Phone ou API key não configurados.'}), 400
         msg = f"🧪 Teste do Sistema Cantina - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
-        ok = enviar_whatsapp_callmebot(phone, apikey, msg)
-        return jsonify({'sucesso': ok, 'mensagem': 'Mensagem enviada!' if ok else 'Falha ao enviar.'})
+        ok = enviar_whatsapp('', msg)
+        return jsonify({'sucesso': ok, 'mensagem': 'Mensagem aceita pelo CallMeBot. Confira o recebimento no WhatsApp.' if ok else 'Envio nao confirmado. Confira habilitacao, metodo, telefone e chave na Vercel.'})
     except Exception as e:
         app.logger.error(f'Erro no teste WhatsApp: {e}')
         return jsonify({'sucesso': False, 'mensagem': str(e)}), 500

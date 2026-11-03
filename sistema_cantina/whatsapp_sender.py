@@ -18,6 +18,8 @@ def _get_config():
     """Carrega configurações do arquivo JSON."""
     import json
     config_path = Path(__file__).parent / 'config_escola.json'
+    if not config_path.exists():
+        return {}
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
@@ -41,26 +43,22 @@ def enviar_whatsapp_callmebot(phone, apikey, mensagem):
     """
     for tentativa in range(1, 4):
         try:
-            mensagem_encoded = urllib.parse.quote(mensagem)
-            url = (
-                f"https://api.callmebot.com/whatsapp.php"
-                f"?phone={phone}"
-                f"&text={mensagem_encoded}"
-                f"&apikey={apikey}"
-            )
+            url = 'https://api.callmebot.com/whatsapp.php?' + urllib.parse.urlencode(
+                {'phone': phone, 'text': mensagem, 'apikey': apikey})
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=30) as response:
+            # Three attempts plus backoff must fit the 60-second function limit.
+            with urllib.request.urlopen(req, timeout=12) as response:
                 resultado = response.read().decode('utf-8')
 
-            if 'Message queued' in resultado or '200' in resultado:
-                logger.info(f'Mensagem WhatsApp enviada com sucesso para {phone}')
+            if 'Message queued' in resultado:
+                logger.info('Mensagem aceita na fila do CallMeBot.')
                 return True
 
-            logger.warning(f'Resposta inesperada do CallMeBot na tentativa {tentativa}: {resultado}')
+            logger.warning('CallMeBot nao confirmou envio na tentativa %s.', tentativa)
         except urllib.error.URLError as e:
-            logger.error(f'Erro de rede ao enviar WhatsApp na tentativa {tentativa}: {e}')
+            logger.error('Erro de rede no CallMeBot na tentativa %s (%s).', tentativa, type(e).__name__)
         except Exception as e:
-            logger.error(f'Erro ao enviar WhatsApp via CallMeBot na tentativa {tentativa}: {e}')
+            logger.error('Erro no CallMeBot na tentativa %s (%s).', tentativa, type(e).__name__)
 
         if tentativa < 3:
             time.sleep(2 ** (tentativa - 1))
@@ -117,23 +115,15 @@ def enviar_whatsapp(destinatario, mensagem):
     apikey = os.environ.get('CALLMEBOT_API_KEY', '').strip()
     
     if not habilitado:
-        logger.info('WhatsApp desabilitado. Mensagem simulada:')
-        logger.info(f'  Para: {destinatario}')
-        logger.info(f'  Texto: {mensagem[:100]}...')
-        print(f'\n[WhatsApp Desabilitado] Mensagem simulada:')
-        print(f'  Para: {destinatario}')
-        print(f'  Texto: {mensagem[:200]}...' if len(mensagem) > 200 else f'  Texto: {mensagem}')
-        return True
+        logger.info('WhatsApp desabilitado; nenhuma mensagem enviada.')
+        return False
     
     # Tentar CallMeBot primeiro
     if metodo == 'callmebot' and phone and apikey:
-        resultado = enviar_whatsapp_callmebot(phone, apikey, mensagem)
-        if resultado:
-            return True
-        logger.warning('CallMeBot falhou, tentando pywhatkit como fallback...')
+        return enviar_whatsapp_callmebot(phone, apikey, mensagem)
     
     # Fallback para pywhatkit
-    if destinatario:
+    if destinatario and not os.environ.get('VERCEL'):
         return enviar_whatsapp_pywhatkit(destinatario, mensagem)
     
     logger.error('Nenhum método de envio WhatsApp configurado corretamente.')
