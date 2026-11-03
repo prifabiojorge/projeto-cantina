@@ -11,12 +11,14 @@
             background-color: #fff8f0;
         }
         .scanner-container {
-            max-width: 800px;
+            max-width: 100%;
             margin: 0 auto;
         }
         #reader {
             width: 100%;
-            height: 500px;
+            height: auto;
+            min-height: 280px;
+            aspect-ratio: 16 / 9;
             border: 3px dashed #ccc;
             border-radius: 10px;
             overflow: hidden;
@@ -94,6 +96,9 @@
             0% { background-color: #fff8f0; }
             50% { background-color: #ffcccc; }
             100% { background-color: #fff8f0; }
+        }
+        @media (max-width: 767px) {
+            #reader { min-height: 200px; }
         }
     </style>
 </head>
@@ -310,6 +315,7 @@
         let soundEnabled = true;
         let processandoScan = false; // Flag para evitar leituras duplicadas
         let ultimoQrCode = null;
+        let ultimoScanEm = 0;
 
         // Data de hoje
         document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR');
@@ -332,17 +338,27 @@
         function iniciarScanner() {
             // Inicializar áudio (necessário para contornar autoplay policy)
             initAudio();
-            const config = { fps: 10, qrbox: { width: 500, height: 500 } };
             
-            Html5Qrcode.getCameras().then(devices => {
+            return Html5Qrcode.getCameras().then(devices => {
                 if (devices && devices.length) {
                     // Usar a câmera traseira se disponível, senão a primeira
                     const backCamera = devices.find(d => d.label.toLowerCase().includes('back'));
                     const cameraId = backCamera ? backCamera.id : devices[0].id;
                     currentCameraId = cameraId;
 
-                    html5QrCode = new Html5Qrcode("reader");
-                    html5QrCode.start(
+                    html5QrCode = new Html5Qrcode("reader", {
+                        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+                    });
+                    // Sem qrbox: examina toda a imagem, incluindo as bordas.
+                    const config = {
+                        fps: 15,
+                        videoConstraints: {
+                            deviceId: { exact: cameraId },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    };
+                    return html5QrCode.start(
                         cameraId,
                         config,
                         onScanSuccess,
@@ -350,6 +366,15 @@
                     ).then(() => {
                         document.getElementById('btn-start').disabled = true;
                         document.getElementById('btn-stop').disabled = false;
+                        try {
+                            const recursos = html5QrCode.getRunningTrackCapabilities();
+                            if (recursos.focusMode?.includes('continuous')) {
+                                html5QrCode.applyVideoConstraints({ advanced: [{ focusMode: 'continuous' }] })
+                                    .catch(err => console.warn('Foco automático indisponível:', err));
+                            }
+                        } catch (err) {
+                            console.warn('Recursos de foco indisponíveis:', err);
+                        }
                     }).catch(err => {
                         console.error('Erro ao iniciar scanner:', err);
                         alert('Não foi possível iniciar a câmera. Verifique as permissões.');
@@ -380,20 +405,22 @@
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Evitar múltiplas leituras rápidas
-            if (processandoScan) {
-                return; // Ignora leitura se já está processando outra
+            if (processandoScan || (decodedText === ultimoQrCode && Date.now() - ultimoScanEm < 2000)) {
+                return;
             }
             processandoScan = true;
             ultimoQrCode = decodedText;
             
             // Enviar para o backend
-            fetch('/api/checkin-cantina', {
+            return fetch('/api/checkin-cantina', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qrcode_hash: decodedText })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('Falha ao registrar check-in');
+                return response.json();
+            })
             .then(resultado => {
                 exibirResultado(resultado);
                 // Atualizar indicador de alarme
@@ -402,18 +429,14 @@
                 adicionarUltimoRegistro(resultado);
                 // Atualizar contador
                 atualizarContador();
-                // Liberar para próxima leitura após 2 segundos
-                setTimeout(() => {
-                    processandoScan = false;
-                }, 2000);
             })
             .catch(error => {
                 console.error('Erro ao enviar check-in:', error);
                 exibirErro('Falha na comunicação com o servidor');
-                // Liberar para próxima leitura após 2 segundos
-                setTimeout(() => {
-                    processandoScan = false;
-                }, 2000);
+            })
+            .finally(() => {
+                ultimoScanEm = Date.now();
+                processandoScan = false;
             });
         }
 
@@ -529,6 +552,7 @@
         }
 
         function registrarLiberacaoForcada() {
+            if (processandoScan) return;
             const motivo = document.getElementById('liberacao-motivo').value.trim();
             const responsavel = document.getElementById('liberacao-responsavel').value.trim();
             const botao = document.getElementById('btn-liberacao-forcada');
@@ -541,8 +565,9 @@
                 return;
             }
 
+            processandoScan = true;
             botao.disabled = true;
-            fetch('/api/cantina/liberacao-forcada', {
+            return fetch('/api/cantina/liberacao-forcada', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -569,9 +594,8 @@
             })
             .finally(() => {
                 botao.disabled = false;
-                setTimeout(() => {
-                    processandoScan = false;
-                }, 500);
+                ultimoScanEm = Date.now();
+                processandoScan = false;
             });
         }
 
