@@ -121,6 +121,16 @@
             padding-bottom: 15px;
             border-bottom: 2px solid #007bff;
         }
+        .card-logos {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 7mm;
+            margin-bottom: 1mm;
+        }
+        .card-logos img { display: block; object-fit: contain; }
+        .logo-celso { width: 7mm; height: 7mm; }
+        .logo-ciseb { width: 18mm; height: 7mm; }
         @media print {
             body { margin: 0; }
             body * { visibility: visible; }
@@ -261,12 +271,15 @@
         
         <div class="qrcode-card">
             <div>
+                <div class="card-logos">
+                    <img src="{{ url_for('static', filename='img/logo-celso.png') }}" alt="Escola Estadual Celso Rodrigues" class="logo-celso">
+                    <img src="{{ url_for('static', filename='img/logo-ciseb.png') }}" alt="CISEB" class="logo-ciseb">
+                </div>
                 <div class="student-info">
                     <div class="student-name">{{ aluno.nome }}</div>
                     <div class="student-details">
                         <div>Matrícula: {{ aluno.matricula }}</div>
                         <div>Turma: {{ aluno.turma }}</div>
-                        <div>Turno: {{ aluno.turno }}</div>
                     </div>
                 </div>
                 {% if aluno.qrcode_hash %}
