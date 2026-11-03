@@ -251,8 +251,54 @@
         atualizarContador();
         setInterval(atualizarContador, 30000); // Atualiza a cada 30 segundos
 
+        let scanAudio = null;
+
+        function prepararAudio() {
+            try {
+                const Audio = window.AudioContext || window.webkitAudioContext;
+                if (!Audio) return null;
+                if (!scanAudio) scanAudio = new Audio();
+                if (scanAudio.state === 'suspended') {
+                    scanAudio.resume().catch(err => console.warn('Som indisponível:', err));
+                }
+                return scanAudio;
+            } catch (err) {
+                console.warn('Som indisponível:', err);
+                return null;
+            }
+        }
+
+        function tocarSomScan(status) {
+            if (status !== 'ok' && status !== 'ja_registrado') return;
+            const audio = prepararAudio();
+            if (!audio) return;
+            try {
+                const frequencias = status === 'ok' ? [880, 1320] : [440, 330, 440];
+                const duracao = status === 'ok' ? 0.16 : 0.24;
+                frequencias.forEach((frequencia, i) => {
+                    const inicio = audio.currentTime + i * (duracao + 0.08);
+                    const oscilador = audio.createOscillator();
+                    const volume = audio.createGain();
+                    oscilador.type = 'square';
+                    oscilador.frequency.value = frequencia;
+                    volume.gain.setValueAtTime(0, inicio);
+                    volume.gain.linearRampToValueAtTime(0.8, inicio + 0.01);
+                    volume.gain.setValueAtTime(0.8, inicio + duracao - 0.02);
+                    volume.gain.linearRampToValueAtTime(0, inicio + duracao);
+                    oscilador.connect(volume);
+                    volume.connect(audio.destination);
+                    oscilador.onended = () => { oscilador.disconnect(); volume.disconnect(); };
+                    oscilador.start(inicio);
+                    oscilador.stop(inicio + duracao);
+                });
+            } catch (err) {
+                console.warn('Falha ao reproduzir som:', err);
+            }
+        }
+
         // Configurar scanner
         function iniciarScanner() {
+            prepararAudio();
             const config = { fps: 10, qrbox: { width: 500, height: 500 } };
             
             Html5Qrcode.getCameras().then(devices => {
@@ -316,6 +362,7 @@
             .then(response => response.json())
             .then(resultado => {
                 exibirResultado(resultado);
+                tocarSomScan(resultado.status);
                 // Registrar no histórico
                 adicionarUltimoRegistro(resultado);
                 // Atualizar contador
