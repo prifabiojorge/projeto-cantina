@@ -5,7 +5,7 @@ import os
 import atexit
 import csv
 import io
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -730,7 +730,7 @@ def api_whatsapp_teste():
     """Envia mensagem de teste via WhatsApp (CallMeBot)."""
     from whatsapp_sender import enviar_whatsapp, WhatsAppError
     try:
-        msg = f"🧪 Teste do Sistema Cantina - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
+        msg = f"🧪 Teste do Sistema Cantina - {datetime.now(timezone(timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
         ok = enviar_whatsapp('', msg)
         return jsonify({'sucesso': ok, 'mensagem': 'Mensagem aceita pelo CallMeBot. Confira o recebimento no WhatsApp.' if ok else 'Envio nao confirmado. Confira habilitacao, metodo, telefone e chave na Vercel.'})
     except WhatsAppError as e:

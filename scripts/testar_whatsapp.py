@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sistema_cantina'))
 import whatsapp_sender as wa
@@ -53,4 +54,26 @@ with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patc
     sucesso, mensagem = models.enviar_relatorio_whatsapp_agora()
     assert sucesso is False and mensagem == 'Chave rejeitada'
     registrar.assert_called_once_with(1, status='falha', mensagem='Chave rejeitada')
+
+# Simulate a UTC server, including the interval when Fortaleza is on the previous day.
+with patch.dict(os.environ, CANTINA_DISABLE_SCHEDULER='true', V2_AUTH_REQUIRED='false'), patch('database.init_db'):
+    from app import app, _legacy
+for instante, data_local, hora_local in [
+    ('2026-11-03T12:39:15+00:00', '03/11/2026', '09:39:15'),
+    ('2026-11-04T01:30:00+00:00', '03/11/2026', '22:30:00'),
+]:
+    referencia = datetime.fromisoformat(instante)
+    class RelogioFixo(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return referencia.astimezone(tz) if tz else referencia.replace(tzinfo=None)
+
+    with patch.object(wa, 'datetime', RelogioFixo), patch.object(wa, 'enviar_whatsapp', return_value=True) as enviar:
+        assert wa.enviar_relatorio_diario(2)
+        assert data_local in enviar.call_args.args[1]
+    with patch.object(_legacy, 'datetime', RelogioFixo), patch.object(wa, 'enviar_whatsapp', return_value=True) as enviar:
+        resposta = app.test_client().post('/api/whatsapp/teste')
+        assert resposta.status_code == 200 and resposta.json['sucesso']
+        assert f'{data_local} {hora_local}' in enviar.call_args.args[1]
+print('OK: mensagens usam Fortaleza em servidor UTC, inclusive na virada do dia.')
 print('OK: configuracao por ambiente, desabilitado, credencial ausente, confirmacao do provedor e falha sem marcar enviado.')

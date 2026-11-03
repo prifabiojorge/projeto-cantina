@@ -12,7 +12,7 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +170,7 @@ def enviar_relatorio_diario(total_esperado, total_real=None, detalhes=None):
     Returns:
         bool: Sucesso do envio.
     """
-    from datetime import date
-    hoje = date.today().strftime('%d/%m/%Y')
+    hoje = datetime.now(timezone(timedelta(hours=-3))).strftime('%d/%m/%Y')
     
     if total_real is None:
         mensagem = f"""📋 *Relatório Cantina Escola* - {hoje}

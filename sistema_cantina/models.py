@@ -511,7 +511,7 @@ def enviar_relatorio_whatsapp_agora():
     Gera e envia relatório diário via WhatsApp.
     Retorna (sucesso, mensagem).
     """
-    from datetime import datetime
+    from datetime import datetime, timezone, timedelta
     # Verifica se já foi enviado hoje
     if relatorio_ja_enviado_hoje():
         return False, 'Relatório já enviado hoje.'
@@ -523,7 +523,7 @@ def enviar_relatorio_whatsapp_agora():
         return False, 'Nenhum check-in registrado hoje. Relatório não enviado.'
     
     # Prepara mensagem para log
-    hoje = datetime.now().strftime('%d/%m/%Y %H:%M')
+    hoje = datetime.now(timezone(timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M')
     mensagem_log = f'''Relatório Cantina Escola - {hoje}
 Previsão de almoços: {total} alunos
 {relatorio.get('texto_detalhes', 'Sem detalhes')}
