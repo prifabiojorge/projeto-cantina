@@ -467,14 +467,15 @@
                     ? 'Aluno liberado manualmente.'
                     : 'Aluno autorizado! Bom apetite.';
                 message.className = 'text-success';
-                playBipSucesso();
+                stopAlarme();
+                if (soundEnabled) playBipSucesso();
             } else if (resultado.status === 'ja_almocou') {
                 card.classList.add('status-ja_almocou');
                 header.classList.add('bg-warning', 'text-dark');
                 icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning"></i>';
                 message.textContent = 'Aluno já almoçou hoje.';
                 message.className = 'text-warning';
-                playAlarme();
+                if (soundEnabled) playAlarme();
             } else if (resultado.status === 'inativo') {
                 card.classList.add('status-inativo');
                 header.classList.add('bg-danger', 'text-white');
@@ -634,6 +635,7 @@
             } else {
                 statusEl.textContent = 'Som: OFF';
                 toggleText.textContent = 'Ligar Alarme';
+                stopAlarme();
             }
         }
 

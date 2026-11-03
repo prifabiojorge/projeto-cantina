@@ -33,6 +33,7 @@ const contexto = vm.createContext({
     Date: Relogio, document: { getElementById: elemento }, window: {},
     Html5Qrcode: Scanner, Html5QrcodeSupportedFormats: { QR_CODE: 0 },
     initAudio() {}, playBipSucesso() { sons.push('sucesso'); }, playAlarme() { sons.push('alarme'); },
+    stopAlarme() { sons.push('parar'); },
     setInterval() {}, setTimeout,
     console: { log() {}, warn() {}, error() {} },
     alert(message) { throw new Error(message); },
@@ -79,7 +80,7 @@ async function main() {
     instante += 2000;
     proximaResposta = Promise.resolve(resposta('ja_almocou', 'aluno-b'));
     await contexto.onScanSuccess('aluno-b');
-    assert.deepEqual(sons, ['sucesso', 'sucesso', 'alarme']);
+    assert.deepEqual(sons, ['parar', 'sucesso', 'parar', 'sucesso', 'alarme']);
     assert.equal(elemento('alarm-text').textContent, 'BLOQUEADO - Verificar situação');
 
     proximaResposta = Promise.resolve(resposta('sem_checkin_portaria', 'aluno-c'));
@@ -121,6 +122,18 @@ async function main() {
     assert.equal(elemento('aluno-nome').textContent, 'ERRO');
     await contexto.onScanSuccess('aluno-g');
     assert.equal(requests.at(-1).qrcode_hash, 'aluno-g');
+    contexto.toggleSound();
+    assert.equal(elemento('sound-status').textContent, 'Som: OFF');
+    const confirmacoes = sons.filter(s => s === 'sucesso').length;
+    const alarmes = sons.filter(s => s === 'alarme').length;
+    await contexto.onScanSuccess('aluno-h');
+    proximaResposta = Promise.resolve(resposta('ja_almocou', 'aluno-i'));
+    await contexto.onScanSuccess('aluno-i');
+    assert.equal(sons.filter(s => s === 'sucesso').length, confirmacoes);
+    assert.equal(sons.filter(s => s === 'alarme').length, alarmes);
+    contexto.toggleSound();
+    await contexto.onScanSuccess('aluno-j');
+    assert.equal(sons.at(-1), 'sucesso');
     console.log('OK: scanner ampliado, HD, foco opcional, proximo aluno, repeticao, alarme, liberacao manual e falha sem travamento.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

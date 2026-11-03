@@ -15,15 +15,26 @@ function initAudio() {
 
 function playBipSucesso() {
   if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = 880;
-  gain.gain.value = 0.3;
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.2);
+  try {
+    [880, 1320].forEach((frequencia, i) => {
+      const inicio = audioCtx.currentTime + i * 0.24;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = frequencia;
+      gain.gain.setValueAtTime(0, inicio);
+      gain.gain.linearRampToValueAtTime(0.8, inicio + 0.01);
+      gain.gain.setValueAtTime(0.8, inicio + 0.14);
+      gain.gain.linearRampToValueAtTime(0, inicio + 0.16);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+      osc.start(inicio);
+      osc.stop(inicio + 0.16);
+    });
+  } catch (err) {
+    console.warn('Som de confirmação indisponível:', err);
+  }
 }
 
 function playAlarme() {
