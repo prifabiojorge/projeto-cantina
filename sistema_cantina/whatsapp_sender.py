@@ -6,6 +6,8 @@ CallMeBot: https://www.callmebot.com/blog/free-api-whatsapp-messages/
 """
 import logging
 import os
+import re
+from html import unescape
 import time
 import urllib.parse
 import urllib.request
@@ -13,6 +15,10 @@ from pathlib import Path
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+class WhatsAppError(RuntimeError):
+    """Mensagem de diagnostico sem telefone, chave ou resposta bruta do provedor."""
 
 def _get_config():
     """Carrega configurações do arquivo JSON."""
@@ -39,7 +45,7 @@ def enviar_whatsapp_callmebot(phone, apikey, mensagem):
         mensagem (str): Texto da mensagem
         
     Returns:
-        bool: True se enviado com sucesso, False se erro.
+        True quando aceito na fila; falhas levantam WhatsAppError.
     """
     for tentativa in range(1, 4):
         try:
@@ -50,11 +56,28 @@ def enviar_whatsapp_callmebot(phone, apikey, mensagem):
             with urllib.request.urlopen(req, timeout=12) as response:
                 resultado = response.read().decode('utf-8')
 
-            if 'Message queued' in resultado:
+            texto = unescape(re.sub(r'<[^>]+>', ' ', resultado)).casefold()
+            if re.search(r'\bmessage\s+queued\b', texto) and not re.search(r'\b(error|invalid|not queued)\b', texto):
                 logger.info('Mensagem aceita na fila do CallMeBot.')
                 return True
 
-            logger.warning('CallMeBot nao confirmou envio na tentativa %s.', tentativa)
+            if 'api' in texto and ('invalid' in texto or 'wrong' in texto):
+                raise WhatsAppError('CallMeBot rejeitou a chave. Confira se CALLMEBOT_API_KEY corresponde ao telefone autorizado.')
+            if 'not authorized' in texto or 'not allowed' in texto or 'not activated' in texto:
+                raise WhatsAppError('Telefone nao autorizado no CallMeBot. Confirme a ativacao desse numero com o bot.')
+            if 'phone' in texto and ('invalid' in texto or 'wrong' in texto):
+                raise WhatsAppError('CallMeBot rejeitou o telefone. Confira o codigo do pais, DDD e numero autorizado.')
+            if 'limit' in texto or 'too many' in texto:
+                raise WhatsAppError('CallMeBot informou limite de uso. Aguarde antes de tentar novamente.')
+            raise WhatsAppError('CallMeBot respondeu, mas nao confirmou entrada na fila. Confira a ativacao do telefone e a disponibilidade do servico.')
+        except WhatsAppError:
+            raise
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                raise WhatsAppError('CallMeBot retornou HTTP 429: limite de requisicoes. Aguarde antes de tentar novamente.') from None
+            if e.code < 500:
+                raise WhatsAppError(f'CallMeBot recusou a requisicao (HTTP {e.code}). Confira a ativacao do telefone e as credenciais.') from None
+            logger.warning('CallMeBot retornou HTTP %s na tentativa %s.', e.code, tentativa)
         except urllib.error.URLError as e:
             logger.error('Erro de rede no CallMeBot na tentativa %s (%s).', tentativa, type(e).__name__)
         except Exception as e:
@@ -63,7 +86,7 @@ def enviar_whatsapp_callmebot(phone, apikey, mensagem):
         if tentativa < 3:
             time.sleep(2 ** (tentativa - 1))
 
-    return False
+    raise WhatsAppError('Nao foi possivel conectar ao CallMeBot apos tres tentativas. Verifique a disponibilidade do servico e os logs da Vercel.')
 
 
 def enviar_whatsapp_pywhatkit(destinatario, mensagem):
@@ -110,24 +133,29 @@ def enviar_whatsapp(destinatario, mensagem):
         if env_enabled is not None
         else whatsapp_config.get('habilitado', False)
     )
-    metodo = os.environ.get('WHATSAPP_METHOD', '').strip() or whatsapp_config.get('metodo', 'callmebot')
+    metodo = (os.environ.get('WHATSAPP_METHOD', '').strip() or whatsapp_config.get('metodo', 'callmebot')).lower()
     phone = os.environ.get('WHATSAPP_PHONE_NUMBER', '').strip() or whatsapp_config.get('numero_telefone', '')
     apikey = os.environ.get('CALLMEBOT_API_KEY', '').strip()
     
     if not habilitado:
-        logger.info('WhatsApp desabilitado; nenhuma mensagem enviada.')
-        return False
+        raise WhatsAppError('WhatsApp desabilitado neste deploy. Defina WHATSAPP_ENABLED=true em Production e faca um novo deploy.')
     
     # Tentar CallMeBot primeiro
-    if metodo == 'callmebot' and phone and apikey:
+    if metodo == 'callmebot':
+        if not phone:
+            raise WhatsAppError('WHATSAPP_PHONE_NUMBER ausente neste deploy. Configure em Production e publique novamente.')
+        if not apikey:
+            raise WhatsAppError('CALLMEBOT_API_KEY ausente neste deploy. Configure em Production e publique novamente.')
+        phone = re.sub(r'[\s()+-]', '', phone)
+        if not re.fullmatch(r'[1-9][0-9]{9,14}', phone):
+            raise WhatsAppError('Telefone invalido. Use codigo do pais, DDD e numero, sem letras.')
         return enviar_whatsapp_callmebot(phone, apikey, mensagem)
     
     # Fallback para pywhatkit
     if destinatario and not os.environ.get('VERCEL'):
         return enviar_whatsapp_pywhatkit(destinatario, mensagem)
     
-    logger.error('Nenhum método de envio WhatsApp configurado corretamente.')
-    return False
+    raise WhatsAppError('Metodo indisponivel. Configure WHATSAPP_METHOD=callmebot em Production e publique novamente.')
 
 
 def enviar_relatorio_diario(total_esperado, total_real=None, detalhes=None):

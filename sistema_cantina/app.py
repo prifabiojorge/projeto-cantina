@@ -728,14 +728,17 @@ def api_relatorio_gerar_agora():
 @app.route('/api/whatsapp/teste', methods=['POST'])
 def api_whatsapp_teste():
     """Envia mensagem de teste via WhatsApp (CallMeBot)."""
-    from whatsapp_sender import enviar_whatsapp
+    from whatsapp_sender import enviar_whatsapp, WhatsAppError
     try:
         msg = f"🧪 Teste do Sistema Cantina - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\nSe você recebeu esta mensagem, a integração está funcionando!"
         ok = enviar_whatsapp('', msg)
         return jsonify({'sucesso': ok, 'mensagem': 'Mensagem aceita pelo CallMeBot. Confira o recebimento no WhatsApp.' if ok else 'Envio nao confirmado. Confira habilitacao, metodo, telefone e chave na Vercel.'})
+    except WhatsAppError as e:
+        app.logger.warning('Teste WhatsApp: %s', e)
+        return jsonify({'sucesso': False, 'mensagem': str(e)})
     except Exception as e:
-        app.logger.error(f'Erro no teste WhatsApp: {e}')
-        return jsonify({'sucesso': False, 'mensagem': str(e)}), 500
+        app.logger.error('Erro inesperado no teste WhatsApp (%s).', type(e).__name__)
+        return jsonify({'sucesso': False, 'mensagem': 'Erro interno ao testar WhatsApp. Consulte os logs da Vercel.'}), 500
 
 @app.route('/admin/configuracoes', methods=['GET', 'POST'])
 def admin_configuracoes():

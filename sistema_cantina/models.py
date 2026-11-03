@@ -543,9 +543,13 @@ Previsão de almoços: {total} alunos
         logger.error(f'Erro ao salvar relatório em arquivo: {e}')
     
     # Envia via WhatsApp
-    from whatsapp_sender import enviar_relatorio_diario
+    from whatsapp_sender import enviar_relatorio_diario, WhatsAppError
     detalhes = relatorio['texto_detalhes'] if relatorio['texto_detalhes'] else None
-    sucesso = enviar_relatorio_diario(total_esperado=total, detalhes=detalhes)
+    try:
+        sucesso = enviar_relatorio_diario(total_esperado=total, detalhes=detalhes)
+    except WhatsAppError as exc:
+        registrar_relatorio_enviado(total, status='falha', mensagem=str(exc))
+        return False, str(exc)
     
     if sucesso:
         # Registra envio
