@@ -300,6 +300,25 @@ def relatorio_ja_enviado_hoje():
     return bool(rows('relatorios_enviados', data=hoje(), status='enviado'))
 
 
+def reservar_envio_relatorio(total_esperado):
+    registro = next(iter(rows('relatorios_enviados', data=hoje())), None)
+    if registro and (registro['status'] == 'enviado' or
+                     (registro['status'] == 'pendente' and registro.get('mensagem') == 'Envio em andamento.')):
+        return False
+    payload = dict(data=hoje(), total_esperado=total_esperado, status='pendente', mensagem='Envio em andamento.')
+    if registro:
+        # updated_at impede duas funcoes Vercel de reservarem o mesmo envio.
+        return bool(client().table('relatorios_enviados').update(payload)
+                    .eq('id', registro['id']).eq('updated_at', registro['updated_at']).execute().data)
+    try:
+        client().table('relatorios_enviados').insert(payload).execute()
+        return True
+    except APIError as exc:
+        if exc.code == '23505':
+            return False
+        raise
+
+
 def registrar_relatorio_enviado(total_esperado, status='enviado', mensagem=None):
     client().table('relatorios_enviados').upsert(dict(data=hoje(), total_esperado=total_esperado,
         status='falhou' if status == 'falha' else status, mensagem=mensagem,

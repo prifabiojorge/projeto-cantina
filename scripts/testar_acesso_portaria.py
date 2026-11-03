@@ -1,5 +1,6 @@
 """Verifica acesso publico da portaria sem rede nem gravacoes de check-in."""
 import os
+import re
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -17,7 +18,10 @@ http = app.test_client()
 resposta = http.get('/portaria')
 assert resposta.status_code == 200
 assert b'btn-start' in resposta.data
-assert b'id="btn-enviar-whatsapp"' not in resposta.data
+assert b'id="btn-enviar-whatsapp"' in resposta.data
+assert b'id="btn-acessar-relatorio-whatsapp"' not in resposta.data
+assert b'Enviar Mensagem de Teste' not in resposta.data
+token = re.search(rb"'X-CSRFToken': '([^']+)'", resposta.data).group(1).decode()
 with patch.object(_legacy, 'registrar_checkin_portaria', return_value={'status':'ok', 'aluno':None}) as registrar:
     resposta = http.post('/api/checkin-portaria', json={'qrcode_hash':'teste-sem-gravar'})
     assert resposta.status_code == 200 and resposta.json['status'] == 'ok'
@@ -28,8 +32,15 @@ with patch.object(_legacy, 'contar_checkins_portaria_hoje', return_value=4):
     assert http.get('/api/portaria/contagem-hoje').json['total'] == 4
 for rota in ('/dashboard', '/alunos', '/backup'):
     assert http.get(rota).status_code == 302
-for rota in ('/api/whatsapp/teste', '/api/relatorio/gerar-agora'):
-    assert http.post(rota).status_code == 302
+assert http.post('/api/whatsapp/teste').status_code == 302
+assert http.get('/api/relatorio/2026-11-03').status_code == 302
+with patch.object(_legacy, 'enviar_relatorio_whatsapp_agora', return_value=(True, 'Aceito para teste')) as enviar:
+    assert http.post('/api/relatorio/gerar-agora').status_code == 400
+    assert http.post('/api/relatorio/gerar-agora', headers={'X-CSRFToken':'invalido'}).status_code == 400
+    enviar.assert_not_called()
+    resposta = http.post('/api/relatorio/gerar-agora', json={'telefone':'nao-utilizar', 'mensagem':'nao-utilizar'}, headers={'X-CSRFToken':token})
+    assert resposta.status_code == 200 and resposta.json['sucesso']
+    enviar.assert_called_once_with()
 assert http.get('/cantina').status_code == 302
 assert http.post('/api/checkin-cantina', json={'qrcode_hash':'teste'}).status_code == 401
 with http.session_transaction() as sessao:
@@ -37,8 +48,14 @@ with http.session_transaction() as sessao:
     sessao['v2_user'] = {'papel':'portaria'}
 assert http.get('/portaria').status_code == 200
 assert http.get('/backup').status_code == 403
-assert http.post('/api/relatorio/gerar-agora').status_code == 403
+with patch.object(_legacy, 'enviar_relatorio_whatsapp_agora', return_value=(False, 'Relatório já enviado hoje.')):
+    resposta = http.post('/api/relatorio/gerar-agora', headers={'X-CSRFToken':token})
+    assert resposta.status_code == 200 and not resposta.json['sucesso']
+assert http.post('/api/whatsapp/teste').status_code == 403
 with http.session_transaction() as sessao:
     sessao['v2_user'] = {'papel':'admin'}
-assert b'id="btn-enviar-whatsapp"' in http.get('/portaria').data
-print('OK: portaria e check-in publicos; WhatsApp, administracao e cantina protegidos.')
+pagina_admin = http.get('/portaria').data
+assert b'id="btn-enviar-whatsapp"' in pagina_admin
+assert b'id="btn-acessar-relatorio-whatsapp"' not in pagina_admin
+assert b'Enviar Mensagem de Teste' in pagina_admin
+print('OK: portaria e envio de relatorio sem login, CSRF ativo, parametros externos ignorados e demais areas protegidas.')

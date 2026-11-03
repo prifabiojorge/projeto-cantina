@@ -1117,7 +1117,6 @@ if csrf is not None:
         api_checkin_portaria,
         api_checkin_cantina,
         api_cantina_liberacao_forcada,
-        api_relatorio_gerar_agora,
         api_whatsapp_teste,
         cron_relatorio_diario,
     ):

@@ -33,9 +33,11 @@ O cadastro assume `Integral`. Esse valor permanece no banco por compatibilidade;
 | `portaria` | Estação e registros da portaria. |
 | `cantina` | Estação e registros da cantina. |
 
-A portaria abre sem login e permite registrar entradas por QR Code e consultar a contagem do dia. O painel WhatsApp nessa tela aparece somente para administradores autenticados. A cantina e a área administrativa continuam exigindo login em produção.
+A portaria abre sem login e permite registrar entradas por QR Code, consultar a contagem do dia e enviar o relatório ao telefone já configurado no servidor. O envio exige a confirmação do operador e permite apenas um relatório aceito por dia, com bloqueio de requisições simultâneas. A mensagem de teste, a cantina e a área administrativa continuam exigindo login em produção.
 
 Use contas individuais e navegadores ou perfis de navegador distintos para manter sessões independentes. Janelas do mesmo perfil compartilham a sessão. Como a portaria é pública, quem tem o endereço e um QR Code válido pode registrar uma entrada.
+
+Se a função do servidor for interrompida durante o envio, o registro pode permanecer como `pendente`, com a mensagem `Envio em andamento.`. Antes de reabrir esse envio, confira no WhatsApp se houve entrega; não remova o bloqueio enquanto houver uma requisição em execução.
 
 A câmera deve ser autorizada no navegador. Para acesso pela rede, utilize HTTPS; no desenvolvimento, `localhost` permite testar a câmera em navegadores compatíveis.
 

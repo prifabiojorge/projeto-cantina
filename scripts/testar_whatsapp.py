@@ -46,14 +46,18 @@ with patch.object(wa.urllib.request, 'urlopen', side_effect=wa.urllib.error.URLE
     assert 'secreta' not in str(erro.exception)
     assert http.call_count == 3
 
-with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patch.object(models, 'gerar_relatorio_portaria_hoje', return_value={'total':1, 'texto_detalhes':''}), patch.object(models, 'registrar_relatorio_enviado') as registrar, patch.object(wa, 'enviar_relatorio_diario', return_value=False), patch('builtins.open', MagicMock()):
+with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patch.object(models, 'gerar_relatorio_portaria_hoje', return_value={'total':1, 'texto_detalhes':''}), patch.object(models, 'reservar_envio_relatorio', return_value=True), patch.object(models, 'registrar_relatorio_enviado') as registrar, patch.object(wa, 'enviar_relatorio_diario', return_value=False), patch('builtins.open', MagicMock()):
     sucesso, _ = models.enviar_relatorio_whatsapp_agora()
     assert sucesso is False
     assert registrar.call_args.kwargs['status'] == 'falha'
-with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patch.object(models, 'gerar_relatorio_portaria_hoje', return_value={'total':1, 'texto_detalhes':''}), patch.object(models, 'registrar_relatorio_enviado') as registrar, patch.object(wa, 'enviar_relatorio_diario', side_effect=wa.WhatsAppError('Chave rejeitada')), patch('builtins.open', MagicMock()):
+with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patch.object(models, 'gerar_relatorio_portaria_hoje', return_value={'total':1, 'texto_detalhes':''}), patch.object(models, 'reservar_envio_relatorio', return_value=True), patch.object(models, 'registrar_relatorio_enviado') as registrar, patch.object(wa, 'enviar_relatorio_diario', side_effect=wa.WhatsAppError('Chave rejeitada')), patch('builtins.open', MagicMock()):
     sucesso, mensagem = models.enviar_relatorio_whatsapp_agora()
     assert sucesso is False and mensagem == 'Chave rejeitada'
     registrar.assert_called_once_with(1, status='falha', mensagem='Chave rejeitada')
+with patch.object(models, 'relatorio_ja_enviado_hoje', return_value=False), patch.object(models, 'gerar_relatorio_portaria_hoje', return_value={'total':1, 'texto_detalhes':''}), patch.object(models, 'reservar_envio_relatorio', return_value=False), patch.object(wa, 'enviar_relatorio_diario') as enviar:
+    sucesso, mensagem = models.enviar_relatorio_whatsapp_agora()
+    assert not sucesso and 'envio em andamento' in mensagem
+    enviar.assert_not_called()
 
 # Simulate a UTC server, including the interval when Fortaleza is on the previous day.
 with patch.dict(os.environ, CANTINA_DISABLE_SCHEDULER='true', V2_AUTH_REQUIRED='false'), patch('database.init_db'):

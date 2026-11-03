@@ -506,6 +506,26 @@ def registrar_relatorio_enviado(total_esperado, status='enviado', mensagem=None)
         conn.close()
     return success
 
+def reservar_envio_relatorio(total_esperado):
+    from datetime import date
+    conn = get_db()
+    try:
+        with conn:
+            cursor = conn.execute('''
+                INSERT INTO relatorios_enviados (data, total_esperado, status, mensagem)
+                VALUES (?, ?, 'pendente', 'Envio em andamento.')
+                ON CONFLICT(data) DO UPDATE SET
+                    total_esperado = excluded.total_esperado,
+                    status = excluded.status, mensagem = excluded.mensagem
+                WHERE relatorios_enviados.status <> 'enviado'
+                  AND NOT (relatorios_enviados.status = 'pendente'
+                           AND COALESCE(relatorios_enviados.mensagem, '') = 'Envio em andamento.')
+            ''', (date.today().isoformat(), total_esperado))
+            return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
 def enviar_relatorio_whatsapp_agora():
     """
     Gera e envia relatório diário via WhatsApp.
@@ -521,6 +541,8 @@ def enviar_relatorio_whatsapp_agora():
     total = relatorio['total']
     if total == 0:
         return False, 'Nenhum check-in registrado hoje. Relatório não enviado.'
+    if not reservar_envio_relatorio(total):
+        return False, 'Relatório já enviado ou envio em andamento. Aguarde antes de tentar novamente.'
     
     # Prepara mensagem para log
     hoje = datetime.now(timezone(timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M')
@@ -1104,7 +1126,7 @@ if os.environ.get('VERCEL') or os.environ.get('CANTINA_DATA_BACKEND') == 'supaba
         'verificar_estado_aluno_para_almoco', 'contar_checkins_portaria_hoje', 'contar_checkins_cantina_hoje',
         'estatisticas_almoco_hoje', 'estatisticas_gerais', 'historico_checkins', 'relatorio_detalhado',
         'relatorio_detalhado_data', 'historico_almoco_semanal', 'almocos_por_turma_hoje', 'ultimas_atividades',
-        'gerar_relatorio_portaria_hoje', 'relatorio_ja_enviado_hoje', 'registrar_relatorio_enviado',
+        'gerar_relatorio_portaria_hoje', 'relatorio_ja_enviado_hoje', 'registrar_relatorio_enviado', 'reservar_envio_relatorio',
         'get_config', 'set_config', 'get_all_config',
     ):
         globals()[_name] = getattr(cloud_models, _name)

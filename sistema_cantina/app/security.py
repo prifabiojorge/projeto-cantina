@@ -35,6 +35,7 @@ PUBLIC_PREFIXES = (
     "/api/checkin-portaria",
     "/api/checkin-cantina",
     "/api/portaria/contagem-hoje",
+    "/api/relatorio/gerar-agora",
     "/api/cantina",
     "/api/cron/relatorio-diario",
 )
