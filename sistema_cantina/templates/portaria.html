@@ -52,6 +52,34 @@
         .turma-badge {
             font-size: 1rem;
         }
+        .portaria-layout {
+            display: grid;
+            grid-template-columns: minmax(280px, 1fr) minmax(0, 3fr);
+            gap: 24px;
+            align-items: start;
+        }
+        .portaria-main { display: contents; }
+        .portaria-scanner { grid-column: 2; grid-row: 1; min-width: 0; }
+        #result-card { grid-column: 1; grid-row: 1; min-width: 0; }
+        .portaria-secondary {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+        }
+        .portaria-secondary > .card { margin-top: 0 !important; }
+        .portaria-history { grid-column: 1 / -1; grid-row: 3; min-width: 0; }
+        .last-scan-name { overflow-wrap: anywhere; }
+        #result-card .badge { white-space: normal; overflow-wrap: anywhere; margin-bottom: 4px; }
+        @media (max-width: 767px) {
+            .portaria-layout { grid-template-columns: minmax(0, 1fr); }
+            #result-card { grid-column: 1; grid-row: 1; }
+            .portaria-scanner { grid-column: 1; grid-row: 2; }
+            .portaria-secondary { grid-row: 3; grid-template-columns: minmax(0, 1fr); }
+            .portaria-history { grid-row: 4; }
+            #reader { height: 320px; }
+        }
     </style>
 </head>
 <body>
@@ -67,9 +95,9 @@
     </nav>
 
     <div class="container-fluid mt-4">
-        <div class="row">
+        <div class="portaria-layout">
             <!-- Contador -->
-            <div class="col-lg-3 col-md-4 mb-4">
+            <div class="portaria-secondary">
                 <div class="card shadow">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Almoços Registrados Hoje</h5>
@@ -116,8 +144,8 @@
             </div>
 
             <!-- Scanner e Resultado -->
-            <div class="col-lg-9 col-md-8">
-                <div class="card shadow">
+            <div class="portaria-main">
+                <div class="card shadow portaria-scanner">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0"><i class="bi bi-camera"></i> Scanner de QR Code</h5>
                     </div>
@@ -143,13 +171,13 @@
                 </div>
 
                 <!-- Resultado do Último Scan -->
-                <div class="card shadow mt-4 result-card" id="result-card" style="display: none;">
+                <div class="card shadow result-card" id="result-card">
                     <div class="card-header" id="result-header">
                         <h5 class="mb-0"><i class="bi bi-person-check"></i> Resultado do Scan</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-8">
+                            <div class="col-12">
                                 <h3 class="last-scan-name" id="aluno-nome">-</h3>
                                 <div class="mt-2">
                                     <span class="badge bg-secondary turma-badge" id="aluno-turma">Turma</span>
@@ -158,7 +186,7 @@
                                 </div>
                                 <p class="mt-3" id="aluno-status-text">Status do registro</p>
                             </div>
-                            <div class="col-md-4 text-center">
+                            <div class="col-12 text-center">
                                 <div class="display-1" id="status-icon">
                                     <i class="bi bi-question-circle"></i>
                                 </div>
@@ -169,7 +197,7 @@
                 </div>
 
                 <!-- Histórico Rápido (últimos 5) -->
-                <div class="card shadow mt-4">
+                <div class="card shadow portaria-history">
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0"><i class="bi bi-clock-history"></i> Últimos Registros</h5>
                     </div>
