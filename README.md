@@ -33,7 +33,9 @@ O cadastro assume `Integral`. Esse valor permanece no banco por compatibilidade;
 | `portaria` | Estação e registros da portaria. |
 | `cantina` | Estação e registros da cantina. |
 
-Em produção, as estações também exigem login. Use contas individuais e navegadores ou perfis de navegador distintos para manter sessões independentes. Janelas do mesmo perfil compartilham a sessão.
+A portaria abre sem login e permite registrar entradas por QR Code e consultar a contagem do dia. O painel WhatsApp nessa tela aparece somente para administradores autenticados. A cantina e a área administrativa continuam exigindo login em produção.
+
+Use contas individuais e navegadores ou perfis de navegador distintos para manter sessões independentes. Janelas do mesmo perfil compartilham a sessão. Como a portaria é pública, quem tem o endereço e um QR Code válido pode registrar uma entrada.
 
 A câmera deve ser autorizada no navegador. Para acesso pela rede, utilize HTTPS; no desenvolvimento, `localhost` permite testar a câmera em navegadores compatíveis.
 

@@ -87,9 +87,7 @@ def install_security_hooks(app):
     def v2_require_auth_for_admin_routes():
         if V2_AUTH_REQUIRED:
             papel = None
-            if _matches(request.path, ('/portaria', '/api/checkin-portaria', '/api/portaria')):
-                papel = 'portaria'
-            elif _matches(request.path, ('/cantina', '/api/checkin-cantina', '/api/cantina')):
+            if _matches(request.path, ('/cantina', '/api/checkin-cantina', '/api/cantina')):
                 papel = 'cantina'
             if papel:
                 if not is_authenticated():

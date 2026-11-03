@@ -67,7 +67,7 @@
             grid-column: 1 / -1;
             grid-row: 2;
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 24px;
         }
         .portaria-secondary > .card { margin-top: 0 !important; }
@@ -114,6 +114,7 @@
                 </div>
 
                 <!-- Botão Enviar Relatório WhatsApp -->
+                {% if session.get('v2_user', {}).get('papel') == 'admin' %}
                 <div class="card shadow mt-4">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp</h5>
@@ -128,6 +129,7 @@
                         <div id="whatsapp-status" class="mt-3" style="display: none;"></div>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="card shadow mt-4">
                     <div class="card-header bg-info text-white">

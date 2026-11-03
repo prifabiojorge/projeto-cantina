@@ -22,7 +22,8 @@ def main():
     app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     http = app.test_client()
     assert http.get('/dashboard').status_code == 302
-    assert http.post('/api/checkin-portaria', json={'qrcode_hash':'teste'}).status_code == 401
+    assert http.get('/portaria').status_code == 200
+    assert http.post('/api/checkin-portaria', json={}).status_code == 400
     with http.session_transaction() as s:
         s['v2_access_token'] = 'teste-local'
         s['v2_user'] = {'papel':'admin','email':'teste-local'}
